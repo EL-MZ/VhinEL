@@ -24,10 +24,29 @@ The fork also includes the editable Blender scene, rendered jackets and turntabl
 
 ## Play a record
 
-1. Open **Archive** and choose **Array** or **Room**.
-2. Select a jacket, then click it again or press `Enter` to inspect it.
-3. Grab the exposed rim, pull the record clear of the sleeve, and drop it over the platter.
-4. Press `Esc` or click `RETURN TO ARCHIVE` to browse again.
+### 1. Pull the record by its rim
+
+Open **Archive** and choose **Array** or **Room**. Select a jacket, then click it again or press `Enter` to inspect it. Grab the exposed rim and drag the record out of the sleeve.
+
+![Record rim peeking out of the album sleeve beside the empty turntable](screenshots/1.png)
+
+### 2. Drop the record onto the platter
+
+Drag the record over the platter and release it.
+
+![Record pulled clear of the sleeve, with the prompt to drop it onto the platter](screenshots/2.png)
+
+### 3. Listen as the stylus lands
+
+The record settles onto the platter, the tonearm lowers, and foobar2000 starts playback. Click **Return to Archive** or press `Esc` to browse again.
+
+![Record seated on the platter with the tonearm lowered and the sleeve alongside](screenshots/3.png)
+
+### 4. Open the fullscreen turntable
+
+During playback, open **Now Spinning** from the transport bar next to **Queue**. In builds with fullscreen controls, click **Fullscreen** or double-click the turntable. Press `Esc` to leave fullscreen.
+
+![Fullscreen close-up of the turntable with the record playing](screenshots/5.png)
 
 ## Install VHINEL
 
