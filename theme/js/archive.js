@@ -1982,7 +1982,7 @@ function archiveKey(vk) {
 // the artist file's lists), else the item under the mouse (the selection stays where it is), else the selected item.
 // { kind: "track" | "album" | "folder", list, name }
 const TF_MENU_TITLE = fb.TitleFormat("%title%");
-function menuTarget(x, y) {
+function menuTarget(x, y, useSelection = true) {
     const a = hits.at(x, y);
     const track = h => { const list = fb.CreateHandleList(); list.Add(h); return { kind: "track", list, name: TF_MENU_TITLE.EvalWithMetadb(h) }; };
     const item = c => { const t = itemTrack(c); return t ? track(t) : { kind: c.folder ? "folder" : "album", list: albumHandles(c), name: c.title || "" }; };
@@ -1997,22 +1997,17 @@ function menuTarget(x, y) {
         if (AR.layout === "grid") { const g = gridAt(x, y); c = g ? LIB.groups[g.gi].albums[g.i] : null; }
         else { const u = caseUnder(x, y), sh = u && !u.empty ? arRows()[u.gi] : null; c = sh ? sh.albums[u.i] || null : null; }
     }
-    c = c || curAlbum();
+    if (!c && useSelection) c = curAlbum();
     return c ? item(c) : null;
 }
 // the target's tracks at the end of a playlist (to < 0: a new one, named by the user); a note says what went where
 function addToPlaylist(tg, to) {
     if (!tg || !tg.list || !tg.list.Count) return;
-    if (to < 0) {
-        let name;
-        try { name = utils.InputBox(window.ID, tr("Playlist name"), tr("New playlist"), tg.name || "", true); } catch (e) { return; }
-        if (!name || !name.trim()) return;
-        to = plman.CreatePlaylist(plman.PlaylistCount, name.trim());
-    }
-    plman.UndoBackup(to);
-    plman.InsertPlaylistItems(to, plman.PlaylistItemCount(to), tg.list);
-    const n = tg.list.Count;
-    archiveNote(`${tr(n === 1 ? "{0} TRACK" : "{0} TRACKS", n)}  ·  ${tr("ADDED TO {0}", plman.GetPlaylistName(to).toUpperCase())}`);
+    if (to < 0) to = newNamedPlaylist(tg.name || "");
+    if (!canReceiveTracks(to)) return;
+    const n = appendUniqueTracks(to, tg.list), name = plman.GetPlaylistName(to);
+    archiveNote(n ? `${tr(n === 1 ? "{0} TRACK" : "{0} TRACKS", n)}  ·  ${tr("ADDED TO {0}", name.toUpperCase())}`
+        : tr("Already in “{0}”", name));
 }
 // every artist, folder or online playlist on shelves of its own, or not (the context menu, GROUP's menu: grid.js barMenu)
 function setShelfPerGroup(on) {

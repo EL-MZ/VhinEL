@@ -365,6 +365,8 @@ I18N["ja"] = {
     "Colour": "カラー", "Black": "ブラック", "White": "ホワイト", "Follow light / dark": "ライト / ダークに合わせる",
     // playlists: play on double-click, the theme's own playlists tagged
     "Play playlist": "このプレイリストを再生", "THEME": "テーマ",
+    "Add selected tracks here": "選択した曲をここに追加",
+    "QUEUE IS EMPTY": "キューは空です", "ADD TO QUEUE": "キューに追加", "ADDED TO QUEUE": "キューに追加しました", "Move up": "上へ移動", "Move down": "下へ移動",
     // archive: group by artist or rating, sort by rating, one shelf per artist or folder
     "INITIAL": "頭文字", "Group by artist": "アーティストでグループ化", "Group by rating": "評価でグループ化", "RATING {0}": "評価 {0}",
     "Rating (highest first)": "評価（高い順）", "One shelf per artist, folder or playlist": "アーティスト・フォルダ・プレイリストごとに 1 段の棚",

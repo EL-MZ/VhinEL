@@ -13,7 +13,7 @@
 // view repaints ten times a second (and every frame while lines scroll); nothing runs while paused, stopped or hidden.
 
 include(fb.ProfilePath + "themes\\audio-archive\\js\\lib\\core.js");
-for (const f of ["emblem", "audio", "ring", "lyrics", "translate", "roman", "waveform", "artist", "album", "playlists", "nowplaying", "library", "online", "onlarchive"]) include(fb.ProfilePath + `themes\\audio-archive\\js\\lib\\${f}.js`);
+for (const f of ["emblem", "audio", "ring", "lyrics", "translate", "roman", "waveform", "artist", "album", "playlists", "queue", "nowplaying", "library", "online", "onlarchive"]) include(fb.ProfilePath + `themes\\audio-archive\\js\\lib\\${f}.js`);
 include(fb.ProfilePath + "themes\\audio-archive\\js\\archive.js");
 include(fb.ProfilePath + "themes\\audio-archive\\js\\artist.js");
 include(fb.ProfilePath + "themes\\audio-archive\\js\\grid.js");
@@ -234,8 +234,10 @@ const clock = Clock((dt, now) => {
         let more = archiveUpdate(dt);
         if (AR.layout === "grid") more = gridUpdate(dt) || more;
         else if (AR.layout === "room") more = roomUpdate(dt) || more;
-        window.RepaintRect(0, 0, AR.dirtyInfo ? W : arrayW(), H);
-        return more;
+        const settling = !!archiveQueueSettle;
+        if (settling && tweenK(archiveQueueSettle.tw) >= 1) archiveQueueSettle = null;
+        window.RepaintRect(0, 0, AR.dirtyInfo || settling ? W : arrayW(), H);
+        return more || !!archiveQueueSettle;
     }
     // 05 ONLINE: its now-playing column (the time) twice a second while playing
     if (STATE.view === "online") {
@@ -272,6 +274,7 @@ onMessage("state", () => {
     // the track can be read before frame.js has sent them, so lyrics read with the defaults are read again
     if (T.handle && lyricsWas && lyricsKey() !== lyricsWas) { T.lyrics = null; npChanged(false, T.handle); }
     const on = STATE.view === "archive";
+    if (!on || STATE.mini) { archiveQueueSwipe = null; archiveQueueSettle = null; }
     const shown = on && !ARCHIVE_ON;
     if (on !== ARCHIVE_ON) { ARCHIVE_ON = on; if (on) requestVisibleThumbs(); else archiveHidden(); }
     // GROUP › ONLINE: the NetEase lists asked for again when the Archive is shown, and while it stays shown once it is
@@ -336,6 +339,8 @@ function on_paint(gr) {
     } finally { LABEL_LIVE = false; }
     drawGrain(gr, 0, 0, W, H);
     drawSideEdges(gr);
+    if (STATE.view === "archive" && AR.layout !== "grid" && !AF.open && AR.insp === 0) drawArchiveNote(gr);
+    if (STATE.view === "archive") drawQueueSwipe(gr, archiveQueueSwipe || archiveQueueSettle, W, H);
 }
 
 // The side columns' edges (lib/bus.js): Lyrics' left column and card, the Archive's album file. While one is dragged
@@ -735,7 +740,19 @@ function drawAlert(gr, g, a) {
 }
 
 // ------------------------------------------------------------------------------------------------------- mouse
+let archiveQueueSwipe = null, archiveQueueSettle = null;
+
+function settleArchiveQueueSwipe(swipe, added) {
+    if (swipe && !REDUCE_MOTION && swipe.distance >= dp(5)) {
+        archiveQueueSettle = { ...swipe, added, tw: Tween(180) };
+        clock.wake();
+    }
+    window.Repaint();
+}
+
 function on_mouse_lbtn_down(x, y, mask) {
+    archiveQueueSwipe = null;
+    if (archiveQueueSettle) { archiveQueueSettle = null; window.Repaint(); }
     if (STATE.mini) { miniDown(x, y); return; }
     if ((STATE.view === "lyrics" || STATE.view === "archive") && sideDragStart(x)) return;
     const a = hits.at(x, y);
@@ -746,6 +763,13 @@ function on_mouse_lbtn_down(x, y, mask) {
     if (STATE.view === "archive" && AR.layout !== "grid" && a && a.id === "ar-ruler") rulerDown(x);
     if (STATE.view === "archive" && a && a.id === "art-bar") artBarDown(y, a);
     if (STATE.view === "online" && a && a.id === "onl-bar") onlBarDown(y, a);
+    if (STATE.view === "archive" && (!a || ["ar-track", "art-trk", "art-alb"].includes(a.id))) {
+        const target = menuTarget(x, y, false);
+        if (target && target.list && target.list.Count) {
+            archiveQueueSwipe = { x, y, hit: a, title: target.name || TF_MENU_TITLE.EvalWithMetadb(target.list[0]),
+                items: target.list, distance: 0, ready: false, moved: false };
+        }
+    }
 }
 function on_mouse_move(x, y, mask) {
     if (STATE.mini) { miniMouseMove(x, mask, hits.at(x, y), y); return; }
@@ -756,6 +780,13 @@ function on_mouse_move(x, y, mask) {
     if (OV.drag) { if (mask & 0x0001) onlBarMove(y); else onlBarUp(); return; }
     if (STATE.view === "style" && styleDrag(x, mask, y)) return;
     if (sideMove(x, mask)) return;
+    if (archiveQueueSwipe) {
+        if (!(mask & 1)) { const swipe = archiveQueueSwipe; archiveQueueSwipe = null; settleArchiveQueueSwipe(swipe, false); }
+        else {
+            updateQueueSwipe(archiveQueueSwipe, x, y);
+            if (archiveQueueSwipe.distance >= dp(5)) { window.SetCursor(32649); return; }
+        }
+    }
     const a = hits.at(x, y), onCase = STATE.view === "archive" && archiveMouseMove(x, y, a);
     if (STATE.view === "style") styleMouseMove(a);
     if (STATE.view === "online") onlineMouseMove(a, x);
@@ -769,6 +800,11 @@ function on_mouse_move(x, y, mask) {
     if (fh !== NP_FAV.hover) { NP_FAV.hover = fh; dirty.card = true; window.Repaint(); }
 }
 function on_mouse_leave() {
+    if (archiveQueueSwipe) {
+        const swipe = archiveQueueSwipe;
+        archiveQueueSwipe = null;
+        settleArchiveQueueSwipe(swipe, false);
+    }
     if (NP_RATE.hover || NP_FAV.hover) { NP_RATE.hover = 0; NP_FAV.hover = false; dirty.card = true; }
     if (STATE.view === "archive") archiveMouseLeave();
     if (STATE.view === "style") styleMouseMove(null);
@@ -816,6 +852,16 @@ function on_mouse_lbtn_up(x, y) {
     if (AR.rulerDrag) { rulerUp(); return; }
     if (AF.drag) { artBarUp(); return; }
     if (OV.drag) { onlBarUp(); return; }
+    const swipe = archiveQueueSwipe;
+    archiveQueueSwipe = null;
+    if (STATE.view === "archive" && swipe && queueSwipeReady(swipe, x, y)) {
+        AR.lastClick = null;
+        const added = enqueueTracks(swipe.items) > 0;
+        if (added) archiveNote(tr("ADDED TO QUEUE"));
+        settleArchiveQueueSwipe(swipe, added);
+        return;
+    }
+    if (swipe && swipe.moved) { AR.lastClick = null; settleArchiveQueueSwipe(swipe, false); return; }
     const a = hits.at(x, y);
     if (STATE.view === "archive") { archiveClick(x, y, a); return; }
     if (STATE.view === "style") { styleClick(a); return; }

@@ -2,13 +2,14 @@
 // 02 · PLAYLISTS, above the native playlist: the playlist head.
 //   row 1  bracketed PLAYLIST NO. 003 (the number rolls on a switch), the name (scrambles in; double-click renames;
 //          the Archive's album playlist shows the album it holds), 041 TRACKS · 3:02:11 · 1.9 GB on the right
-//   row 2  state chips (PLAYING, AUTOPLAYLIST, LOCKED) and the selection count; LAYOUT [ALBUM | INDEX] on the right
+//   row 2  state chips, Add to queue and the selection count; Add to playlist and LAYOUT [ALBUM | INDEX] on the right
 //   a heavy rule, then the playlist's column titles: the native header is off (Windows draws it white on paper), so
 //   they are drawn here, placed the way Columns UI sizes the preset's columns (columns/preset-*.json). Clicking a
 //   title sorts the playlist by it (again: the other way round; Edit › Undo restores the order).
 
 include(fb.ProfilePath + "themes\\audio-archive\\js\\lib\\core.js");
 include(fb.ProfilePath + "themes\\audio-archive\\js\\lib\\playlists.js");
+include(fb.ProfilePath + "themes\\audio-archive\\js\\lib\\queue.js");
 
 const HST = {
     head: { size: 12, weight: 500, track: .12 },
@@ -23,12 +24,15 @@ const hst = (s, colour, bg = C.bg) => Object.assign({ colour, bg }, s);
 let W = 0, H = 0;
 const hits = Hits();
 let hover = null;
+let playlistQueueSwipe = null, playlistQueueSettle = null;
 const P = { pl: -1, name: null, no: Roll("000"), sel: 0 };
+const TF_QUEUE_SELECTION = fb.TitleFormat("%title%");
 
 const clock = Clock(() => {
     const more = (P.name && !scrambleDone(P.name)) || !rollDone(P.no);
+    if (playlistQueueSettle && tweenK(playlistQueueSettle.tw) >= 1) playlistQueueSettle = null;
     window.Repaint();
-    return more;
+    return more || !!playlistQueueSettle;
 });
 
 function load(animate) {
@@ -85,23 +89,29 @@ function on_paint(gr) {
         gr.DrawText(name, nf, C.fg, nx, y, nw, bh, DT_SINGLE | DT_ELLIPSIS);
         hits.add("name", nx, y, Math.min(nw, gr.CalcTextWidth(name, nf)), bh);
     }
-    // row 2: chips and the selection on the left, LAYOUT toggle on the right
+    // row 2: chips and the selection on the left, actions on the right
     const cy = dp(62), ch = dp(18);
+    const layoutLeft = drawLayoutToggle(gr, x1, cy, ch);
+    const actionsLeft = drawAddTracksButton(gr, x0, layoutLeft - dp(16), cy, ch);
     let cx = x0;
     if (pl >= 0) {
         const loc = plman.GetPlayingItemLocation();
         if (loc.IsValid && loc.PlaylistIndex === pl) cx += chip(gr, tr(fb.IsPaused ? "PAUSED" : "PLAYING"), cx, cy, ch, "acc", 9, C.bg) + dp(6);
         if (plman.IsAutoPlaylist(pl)) cx += chip(gr, tr("AUTOPLAYLIST"), cx, cy, ch, "", 9, C.bg) + dp(6);
         else if (plman.IsPlaylistLocked(pl)) cx += chip(gr, tr("LOCKED"), cx, cy, ch, "", 9, C.bg) + dp(6);
-        if (P.sel > 1) label(gr, tr("{0} SELECTED", pad(P.sel, 2)), hst(HST.sel, C["text-muted"]), cx + dp(6), cy + Math.round((ch - labelHeight(HST.sel)) / 2));
+        cx = drawQueueButton(gr, cx, actionsLeft - dp(12), cy, ch);
+        const selection = tr("{0} SELECTED", pad(P.sel, 2)), s = hst(HST.sel, C["text-muted"]);
+        if (P.sel > 1 && cx + dp(6) + labelWidth(selection, s) + dp(10) <= actionsLeft) {
+            label(gr, selection, s, cx + dp(6), cy + Math.round((ch - labelHeight(HST.sel)) / 2));
+        }
     }
-    drawLayoutToggle(gr, x1, cy, ch);
     // heavy rule, column titles, hairline
     const ry = H - dp(34);
     gr.FillSolidRect(0, ry, W, HEAVY, C.fg);
     drawColumns(gr, ry + HEAVY, H - HAIR - ry - HEAVY);
     hline(gr, 0, H - HAIR, W, C.hair);
     drawGrain(gr, 0, 0, W, H);
+    drawQueueSwipe(gr, playlistQueueSwipe || playlistQueueSettle, W, H);
 }
 
 // ------------------------------------------------------------------------------------------------ column titles
@@ -169,7 +179,8 @@ function drawLayoutToggle(gr, xRight, y, hh) {
     const items = [["album", tr("ALBUM")], ["index", tr("INDEX")]], s = hst(HST.tog, 0);
     const widths = items.map(([, t]) => dp(9) + dp(5) + dp(6) + labelWidth(t, s) + dp(9)), total = widths[0] + widths[1];
     let ix = xRight - total;
-    label(gr, tr("LAYOUT"), hst(HST.tog, C["text-muted"]), ix - dp(12), y + Math.round((hh - labelHeight(HST.tog)) / 2), 2);
+    const layout = tr("LAYOUT"), layoutLeft = ix - dp(12) - labelWidth(layout, s);
+    label(gr, layout, hst(HST.tog, C["text-muted"]), ix - dp(12), y + Math.round((hh - labelHeight(HST.tog)) / 2), 2);
     items.forEach(([p, t], i) => {
         const on = STATE.preset === p, hov = !on && hover && hover.id === "preset", col = on ? C.bg : hov ? C.fg : C["text-muted"];
         if (on) gr.FillSolidRect(ix, y, widths[i], hh, C.fg);
@@ -179,19 +190,103 @@ function drawLayoutToggle(gr, xRight, y, hh) {
         ix += widths[i];
     });
     box(gr, xRight - total, y, total, hh, C["line-faint"]);
+    return layoutLeft;
+}
+
+function drawAddTracksButton(gr, minX, right, y, h) {
+    const enabled = P.sel > 0, hot = enabled && hover && hover.id === "add-tracks";
+    const title = tr("Add to playlist"), s = hst(HST.tog, enabled ? C.fg : C["text-muted"]);
+    const w = labelWidth(title, s) + dp(20), x = right - w;
+    if (x < minX) return right;
+    box(gr, x, y, w, h, hot ? C.accent : C["line-faint"]);
+    label(gr, title, s, x + dp(10), y + Math.round((h - labelHeight(HST.tog)) / 2));
+    if (enabled) hits.add("add-tracks", x, y, w, h);
+    return x;
+}
+
+function drawQueueButton(gr, x, right, y, h) {
+    const enabled = P.sel > 0, hot = enabled && hover && hover.id === "queue-add";
+    const s = hst(HST.tog, enabled ? C.fg : C["text-muted"]);
+    let title = tr("ADD TO QUEUE"), w = labelWidth(title, s) + dp(34);
+    if (x + w > right) { title = tr("QUEUE"); w = labelWidth(title, s) + dp(34); }
+    if (x + w > right) return x;
+    box(gr, x, y, w, h, enabled ? C.accent : C["line-faint"]);
+    label(gr, title, s, x + dp(10), y + Math.round((h - labelHeight(HST.tog)) / 2));
+    const ax = x + w - dp(11), ay = y + h / 2;
+    const arrow = hot ? C.fg : enabled ? C.accent : C["text-muted"];
+    gr.DrawLine(ax - dp(4), ay - dp(4), ax, ay, HAIR, arrow);
+    gr.DrawLine(ax, ay, ax - dp(4), ay + dp(4), HAIR, arrow);
+    if (enabled) hits.add("queue-add", x, y, w, h);
+    return x + w + dp(6);
+}
+
+function addTracksMenu(x, y) {
+    const from = plman.ActivePlaylist;
+    if (from < 0) return;
+    const items = plman.GetPlaylistSelectedItems(from);
+    if (!items.Count) return;
+    const menu = window.CreatePopupMenu(), destinations = [];
+    menu.AppendMenuItem(0, 1, tr("New playlist") + "…");
+    for (let i = 0; i < plman.PlaylistCount; i++) {
+        if (i !== from && canReceiveTracks(i)) destinations.push(i);
+    }
+    if (destinations.length) menu.AppendMenuSeparator();
+    destinations.forEach((pl, i) => menu.AppendMenuItem(0, i + 2, plman.GetPlaylistName(pl).replace(/&/g, "&&")));
+    const id = menu.TrackPopupMenu(x, y);
+    if (id > 0) appendUniqueTracks(id === 1 ? newNamedPlaylist() : destinations[id - 2], items);
 }
 
 // --------------------------------------------------------------------------------------------------- mouse
-function on_mouse_move(x, y) {
+function on_mouse_lbtn_down(x, y) {
+    playlistQueueSwipe = null;
+    const a = hits.at(x, y), playlist = plman.ActivePlaylist;
+    if (!a || a.id !== "queue-add" || playlist < 0) return;
+    const items = plman.GetPlaylistSelectedItems(playlist);
+    if (!items.Count) return;
+    const title = items.Count === 1 ? TF_QUEUE_SELECTION.EvalWithMetadb(items[0]) : tr("{0} TRACKS", items.Count);
+    const source = { playlist, indexes: plman.GetPlaylistSelectedIndexes(playlist) };
+    playlistQueueSettle = null;
+    playlistQueueSwipe = { x, y, hit: a, title, items, source, distance: 0, ready: false, moved: false };
+}
+
+function finishPlaylistQueueSwipe(add) {
+    const swipe = playlistQueueSwipe;
+    playlistQueueSwipe = null;
+    if (!swipe) return;
+    const added = add && enqueueTracks(swipe.items, swipe.source) > 0;
+    if (!REDUCE_MOTION && swipe.distance >= dp(5)) {
+        playlistQueueSettle = { ...swipe, added, tw: Tween(180) };
+        clock.wake();
+    }
+    if (added) send("queue-open", true);
+    window.Repaint();
+}
+
+function on_mouse_move(x, y, mask) {
+    if (playlistQueueSwipe) {
+        if (mask & 1) {
+            updateQueueSwipe(playlistQueueSwipe, x, y);
+            window.SetCursor(32649);
+            return;
+        }
+        finishPlaylistQueueSwipe(false);
+    }
     const a = hits.at(x, y);
     if ((a && a.id) !== (hover && hover.id) || (a && a.data) !== (hover && hover.data)) { hover = a; window.Repaint(); }
-    window.SetCursor(a && (a.id === "preset" || a.id === "col") ? 32649 : 32512);
+    window.SetCursor(a && (a.id === "preset" || a.id === "col" || a.id === "add-tracks" || a.id === "queue-add") ? 32649 : 32512);
 }
-function on_mouse_leave() { if (hover) { hover = null; window.Repaint(); } }
+function on_mouse_leave() { finishPlaylistQueueSwipe(false); if (hover) { hover = null; window.Repaint(); } }
 function on_mouse_lbtn_up(x, y) {
     const a = hits.at(x, y);
+    if (playlistQueueSwipe) {
+        const swipe = playlistQueueSwipe;
+        updateQueueSwipe(swipe, x, y);
+        finishPlaylistQueueSwipe(swipe.ready || (!swipe.moved && a && a.id === "queue-add"));
+        return;
+    }
     if (a && a.id === "preset") send("preset");
     else if (a && a.id === "col") sortBy(a.data);
+    else if (a && a.id === "add-tracks") addTracksMenu(a.x, a.y + a.h);
 }
 function on_mouse_lbtn_dblclk(x, y) {
     const a = hits.at(x, y);
@@ -201,7 +296,11 @@ function on_mouse_lbtn_dblclk(x, y) {
     if (name && name.trim()) plman.RenamePlaylist(P.pl, name.trim());
 }
 function on_char(code) { searchChar(code); }
-function on_key_down(vk) { if (searchKey(vk)) return; if (vk === 0x20) fb.PlayOrPause(); else globalKey(vk); }
+function on_key_down(vk) {
+    if (vk === 0x1b && playlistQueueSwipe) { finishPlaylistQueueSwipe(false); return; }
+    if (searchKey(vk)) return;
+    if (vk === 0x20) fb.PlayOrPause(); else globalKey(vk);
+}
 
 // ----------------------------------------------------------------------------------------------- callbacks
 function on_playlist_switch() { load(true); }

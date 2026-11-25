@@ -364,6 +364,8 @@ I18N["ko"] = {
     "Colour": "색상", "Black": "블랙", "White": "화이트", "Follow light / dark": "라이트 / 다크에 맞춤",
     // playlists: play on double-click, the theme's own playlists tagged
     "Play playlist": "이 재생목록 재생", "THEME": "테마",
+    "Add selected tracks here": "선택한 곡을 여기에 추가",
+    "QUEUE IS EMPTY": "대기열이 비어 있습니다", "ADD TO QUEUE": "대기열에 추가", "ADDED TO QUEUE": "대기열에 추가됨", "Move up": "위로 이동", "Move down": "아래로 이동",
     // archive: group by artist or rating, sort by rating, one shelf per artist or folder
     "INITIAL": "첫 글자", "Group by artist": "아티스트별 그룹", "Group by rating": "평점별 그룹", "RATING {0}": "평점 {0}",
     "Rating (highest first)": "평점 (높은 순)", "One shelf per artist, folder or playlist": "아티스트·폴더·재생목록마다 선반 하나",

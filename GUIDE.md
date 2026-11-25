@@ -89,9 +89,12 @@ Running it again keeps the foobar2000 folder and installs the theme again.
 | Playlists: switch | click a row in the playlist manager | `↑` `↓` (manager) |
 | Playlists: play, new, rename, duplicate, remove | double-click a row to play it from the top (from a random track under Random or Shuffle (tracks), from the first track of a random album or folder under Shuffle (albums / folders); the playlist already playing goes on, a paused one resumes); `+ NEW PLAYLIST`; double-click the name in the head to rename; right-click a row for `Play playlist`, `Rename…` and the rest | `Enter` plays, `Ctrl+N`, `F2` renames, `Delete` (manager) |
 | Playlists: reorder | drag a row in the manager | — |
+| Playlists: copy tracks to another playlist | select one or more tracks, then click `Add to playlist` beside `LAYOUT`, drag the selection onto a destination row, or right-click the destination and choose `Add selected tracks here`. Tracks already in the destination are skipped | - |
 | Playlists: find a track | hover the track rail for its card; click to scroll there, double-click to play | — |
 | Playlists: sort | click a column title in the playlist head (again: reversed; *Edit › Undo* restores) | — |
-| Play from the queue | click a row under `QUEUE / NEXT` on the profile card (Playlists and Lyrics views) | — |
+| Edit the playback queue | click `QUEUE` in the player bar. Drag a row up or down, or right-click it for `Move up`, `Move down`, and `Remove` | `Esc` closes the focused panel |
+| Add to the playback queue | in Archive, drag a track row or album cover right until `ADD TO QUEUE` appears, then release. In Playlists, select tracks and click or swipe right on `ADD TO QUEUE` in the playlist header. You can also drop selected track rows onto the right-hand panel | - |
+| Play from the queue | click a row under `QUEUE / NEXT` on the profile card (Playlists and Lyrics views) | - |
 | Signal display: 3D ring, 2D ring or Classic | `MODEL 3D / 2D / CLASSIC` at the top right | `R` cycles (Signal view) |
 | Seek ±5 s | click the signal trace to jump (Signal view; with the level history along the bottom, the thin rule under it) | `←` `→` (Lyrics and Signal views) |
 | Signal view panels: under the ring (spectrum, lyrics, level meters, stereo scope or nothing) and along the bottom (signal trace, lyrics, level history or nothing) | `PANELS` at the top right (3D and 2D), or right-click the Signal view | — |

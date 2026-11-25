@@ -26,6 +26,7 @@ const hits = Hits();
 let hover = null, drag = null;            // drag: { id: "seek" | "vol", value }
 const counts = { files: -1, albums: -1 };
 let section = { text: "", sc: null };
+let queuedCount = plman.GetPlaybackQueueContents().length;
 
 // ---------------------------------------------------------------------------------------------------- geometry
 const M = TOKENS.metrics;
@@ -86,6 +87,7 @@ function on_playback_seek() { playAnchor(); repaintRuler(); }
 function on_playback_time() { repaintRuler(); }
 function on_volume_change() { repaintRuler(); }
 function on_playback_order_changed() { repaintRuler(); }
+function on_playback_queue_changed() { queuedCount = plman.GetPlaybackQueueContents().length; repaintRuler(); }
 if (fb.IsPlaying && !fb.IsPaused) startPlayTimer();
 
 // --------------------------------------------------------------------------------------------- library counts
@@ -265,6 +267,15 @@ function drawRight(gr) {
     const cy = dp(ROW_Y), keyH = labelHeight(ST.key), ky = cy - Math.round(keyH / 2);
     const th = dp(26), ty = cy - th / 2;
     let x = W - dp(24);
+    const queueText = tr("QUEUE") + (queuedCount ? `  ${queuedCount}` : "");
+    const queueStyle = st(ST.key, STATE.queueOpen ? C.bg : C.fg, STATE.queueOpen ? C.fg : C.bg);
+    const qw = labelWidth(queueText, queueStyle) + dp(20);
+    x -= qw;
+    if (STATE.queueOpen) gr.FillSolidRect(x, ty, qw, th, C.fg);
+    else box(gr, x, ty, qw, th, (hover && hover.id === "queue-toggle") || queuedCount ? C.accent : C["line-faint"]);
+    label(gr, queueText, queueStyle, x + dp(10), ky);
+    hits.add("queue-toggle", x, ty, qw, th);
+    x -= dp(18);
     // ORDER
     const order = clamp(plman.PlaybackOrder, 0, ORDERS.length - 1), ohov = hover && hover.id === "order";
     const ow = labelWidth(ORDERS[order], st(ST.val, 0));
@@ -375,6 +386,7 @@ function on_mouse_lbtn_up(x, y) {
     const a = hits.at(x, y);
     if (!a) return;
     if (a.id === "btn") [() => fb.Prev(), () => fb.PlayOrPause(), () => fb.Next(), () => fb.Stop()][a.data]();
+    else if (a.id === "queue-toggle") send("queue-open");
     else if (a.id === "order") orderMenu(a);
     else if (a.id === "update") updateMenu(a.x, a.y);
     else if (a.id === "dsp") { dspMenu(a.x, a.y + a.h); if (readDsp()) window.Repaint(); }

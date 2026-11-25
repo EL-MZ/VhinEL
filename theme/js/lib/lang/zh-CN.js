@@ -364,6 +364,8 @@ I18N["zh-CN"] = {
     "Colour": "颜色", "Black": "黑色", "White": "白色", "Follow light / dark": "跟随深浅色",
     // playlists: play on double-click, the theme's own playlists tagged
     "Play playlist": "播放此列表", "THEME": "主题",
+    "Add selected tracks here": "将选中曲目加入此列表",
+    "QUEUE IS EMPTY": "队列为空", "ADD TO QUEUE": "加入队列", "ADDED TO QUEUE": "已加入队列", "Move up": "上移", "Move down": "下移",
     // archive: group by artist or rating, sort by rating, one shelf per artist or folder
     "INITIAL": "首字母", "Group by artist": "按艺人分组", "Group by rating": "按评分分组", "RATING {0}": "评分 {0}",
     "Rating (highest first)": "评分（最高在前）", "One shelf per artist, folder or playlist": "每位艺人、文件夹或歌单单独一排",

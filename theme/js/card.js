@@ -2,10 +2,11 @@
 // 02 · PLAYLISTS, right: the signal profile card — the same card as the Lyrics view's
 // (lib/nowplaying.js), ending in QUEUE / NEXT instead of the pager, and as tall as the view. The ghost number behind
 // it is the active playlist's. A click on a queue row plays that track; a click on the profile inspects the album in
-// the Archive.
+// the Archive. The transport can switch this panel to the editable playback queue.
 
+window.DefineScript("RhinE Queue and Profile", { features: { drag_n_drop: true } });
 include(fb.ProfilePath + "themes\\audio-archive\\js\\lib\\core.js");
-for (const f of ["waveform", "album", "playlists", "nowplaying"]) include(fb.ProfilePath + `themes\\audio-archive\\js\\lib\\${f}.js`);
+for (const f of ["waveform", "album", "playlists", "queue", "nowplaying", "queue-panel"]) include(fb.ProfilePath + `themes\\audio-archive\\js\\lib\\${f}.js`);
 
 const M = TOKENS.metrics;
 let W = 0, H = 0;
@@ -19,8 +20,11 @@ function npChanged(same, h, what) { window.Repaint(); if (what !== "cover") cloc
 const clock = Clock(dt => {
     let more = stepSpring(heroClear, dt);
     if (T.title && !scrambleDone(T.title)) more = true;
-    if (more) window.Repaint();
-    return more;
+    if (STATE.queueOpen) more = stepQueueRows(dt) || more;
+    const revealing = !!QUEUE_PANEL.reveal;
+    if (revealing && tweenK(QUEUE_PANEL.reveal) >= 1) QUEUE_PANEL.reveal = null;
+    if (more || revealing) window.Repaint();
+    return more || !!QUEUE_PANEL.reveal;
 });
 
 function cardRect() { const g = dp(M.gutter); return [g, g, W - 2 * g, H - 2 * g]; }
@@ -29,7 +33,17 @@ function on_size(w, h) { W = w; H = h; }
 function on_paint(gr) {
     hits.clear();
     gr.FillSolidRect(0, 0, W, H, C.bg);
+    if (STATE.queueOpen) {
+        vline(gr, 0, 0, H, C.hair);
+        drawQueuePanel(gr);
+        drawGrain(gr, 0, 0, W, H);
+        return;
+    }
     if (STATE.view !== "playlists") return;
+    if (QUEUE_PANEL.over) {
+        drawQueueDropFeedback(gr);
+        return;
+    }
     if (wallpaperOn("playlists") && (typeof wallpaperCard !== "function" || wallpaperCard())) drawWallpaper(gr, "card", 0, 0, W, H);   // round the card (lib/wallpaper.js)
     const [x, y, w, h] = cardRect();
     if (w < dp(200) || h < dp(200)) return;
@@ -50,9 +64,19 @@ function on_paint(gr) {
 let edgeHot = false, edgeDrag = null;
 const onEdge = x => x <= dp(5);
 const cardWidthAt = x => clamp(Math.round((W - (x - edgeDrag.off)) / SCALE - 2 * M.gutter), SIDES_RANGE.card[0], SIDES_RANGE.card[1]);
-function on_mouse_lbtn_down(x) { if (STATE.view === "playlists" && onEdge(x)) edgeDrag = { off: x }; }
-function on_mouse_lbtn_dblclk(x) { if (onEdge(x)) sendSide("card", SIDES_START.card, true); }
+function on_mouse_lbtn_down(x, y) {
+    if (STATE.queueOpen) queueRowDown(hits.at(x, y), y);
+    else if (STATE.view === "playlists" && onEdge(x)) edgeDrag = { off: x };
+}
+function on_mouse_lbtn_dblclk(x) { if (!STATE.queueOpen && onEdge(x)) sendSide("card", SIDES_START.card, true); }
 function on_mouse_move(x, y, mask) {
+    if (STATE.queueOpen) {
+        queueRowMove(y, !!(mask & 1));
+        const a = hits.at(x, y);
+        window.SetCursor(QUEUE_PANEL.drag || (a && a.id === "queue-entry") ? 32645 : a ? 32649 : 32512);
+        if ((a && a.id) !== (hover && hover.id) || (a && a.data) !== (hover && hover.data)) { hover = a; window.Repaint(); }
+        return;
+    }
     if (edgeDrag) {
         if (!(mask & 1)) { edgeEnd(x); return; }
         const w = cardWidthAt(x);
@@ -74,6 +98,13 @@ function on_mouse_move(x, y, mask) {
 function on_mouse_leave() { NP_RATE.hover = 0; NP_FAV.hover = false; if (edgeHot && !edgeDrag) edgeHot = false; if (hover) hover = null; window.Repaint(); }
 function edgeEnd(x) { const w = cardWidthAt(x); edgeDrag = null; sendSide("card", w, true); window.Repaint(); }
 function on_mouse_lbtn_up(x, y) {
+    if (STATE.queueOpen) {
+        if (queueRowUp(x, y)) return;
+        const a = hits.at(x, y);
+        if (a && a.id === "queue-close") send("queue-open", false);
+        else if (a && a.id === "queue-remove") removeQueueRow(a.data);
+        return;
+    }
     if (edgeDrag) { edgeEnd(x); return; }
     const a = hits.at(x, y);
     if (a && a.id === "queue") plman.ExecutePlaylistDefaultAction(a.data.pl, a.data.index);
@@ -82,24 +113,69 @@ function on_mouse_lbtn_up(x, y) {
     else if (a && a.id === "profile") send("inspect");
     else if (a && a.id === "folder") openFolder(T.handle);
 }
+function on_mouse_rbtn_up(x, y, mask) { return !(mask & 4) && STATE.queueOpen && queueRowMenu(x, y, hits.at(x, y)); }
+function on_mouse_wheel(step) { if (STATE.queueOpen) scrollQueue(-step * 3); }
 function on_char(code) { searchChar(code); }
-function on_key_down(vk) { if (searchKey(vk)) return; if (vk === 0x20) fb.PlayOrPause(); else globalKey(vk); }
+function on_key_down(vk) {
+    if (STATE.queueOpen && vk === 0x1b) {
+        if (QUEUE_PANEL.drag) stopQueueDrag(); else send("queue-open", false);
+        return;
+    }
+    if (searchKey(vk)) return;
+    if (vk === 0x20) fb.PlayOrPause(); else globalKey(vk);
+}
+
+const queueDrops = trackDropReceiver();
+function queueDropEffect(action) {
+    return (STATE.queueOpen || STATE.view === "playlists") && !queueDrops.busy() ? (action.Effect & 1) || (action.Effect & 4) : 0;
+}
+function queueDropHover(active) {
+    if (QUEUE_PANEL.over === active) return;
+    QUEUE_PANEL.over = active;
+    QUEUE_PANEL.reveal = active && !REDUCE_MOTION ? Tween(150) : null;
+    if (QUEUE_PANEL.reveal) clock.wake();
+    window.Repaint();
+}
+function on_drag_enter(action) { on_drag_over(action); }
+function on_drag_over(action) { action.Effect = queueDropEffect(action); queueDropHover(!!action.Effect); }
+function on_drag_leave() { queueDropHover(false); }
+function on_drag_drop(action) {
+    const effect = queueDropEffect(action);
+    queueDropHover(false);
+    if (!effect) { action.Effect = 0; return; }
+    const playlist = plman.ActivePlaylist;
+    const source = STATE.view === "playlists" && playlist >= 0 ? { playlist, indexes: plman.GetPlaylistSelectedIndexes(playlist) } : null;
+    action.Effect = queueDrops.start(action, items => {
+        enqueueTracks(items, source);
+        send("queue-open", true);
+        return true;
+    }) ? effect : 0;
+}
 
 function on_playback_new_track() { loadTrack(); }
 function on_playback_starting() { window.Repaint(); }
 function on_playback_pause() { window.Repaint(); }
 function on_playback_stop(reason) { if (reason !== 2) loadTrack(); }
-function on_playback_queue_changed() { window.Repaint(); }
+function on_playback_queue_changed() { stopQueueDrag(); window.Repaint(); }
 function on_item_focus_change() { if (!fb.IsPlaying) loadTrack(); else window.Repaint(); }
 function on_metadb_changed() { if (T.handle) loadTrack(); }
 function on_playlist_switch() { window.Repaint(); }
 function on_playlists_changed() { plDirty(); window.Repaint(); }
-function on_playlist_items_added(i) { plDirty(i); window.Repaint(); }
+function on_playlist_items_added(i) { plDirty(i); queueDrops.added(i); window.Repaint(); }
 function on_playlist_items_removed(i) { plDirty(i); window.Repaint(); }
 function on_playlist_items_reordered(i) { plDirty(i); window.Repaint(); }
 function on_colours_changed() { refreshTokens(); window.Repaint(); }
 onMessage("rating-store", () => { if (T.handle) loadTrack(); });
 FAV_LISTENERS.push(() => { if (T.handle) loadTrack(); window.Repaint(); });
-onMessage("state", () => { if (STATE.skin !== CASE_SKIN) loadSkin(STATE.skin); window.Repaint(); });
+let queueWasOpen = false;
+onMessage("state", () => {
+    if (queueWasOpen !== STATE.queueOpen) {
+        queueWasOpen = STATE.queueOpen;
+        edgeHot = false; edgeDrag = null; hover = null;
+        stopQueueDrag();
+    }
+    if (STATE.skin !== CASE_SKIN) loadSkin(STATE.skin);
+    window.Repaint();
+});
 helloFrame();   // lib/bus.js
 window.SetTimeout(loadTrack, 0);

@@ -366,6 +366,8 @@ I18N["fr"] = {
     "Colour": "Couleur", "Black": "Noir", "White": "Blanc", "Follow light / dark": "Suivre clair / sombre",
     // playlists: play on double-click, the theme's own playlists tagged
     "Play playlist": "Lire la playlist", "THEME": "THÈME",
+    "Add selected tracks here": "Ajouter les titres sélectionnés ici",
+    "QUEUE IS EMPTY": "LA FILE EST VIDE", "ADD TO QUEUE": "AJOUTER À LA FILE", "ADDED TO QUEUE": "AJOUTÉ À LA FILE", "Move up": "Monter", "Move down": "Descendre",
     // archive: group by artist or rating, sort by rating, one shelf per artist or folder
     "INITIAL": "INITIALE", "Group by artist": "Grouper par artiste", "Group by rating": "Grouper par note", "RATING {0}": "NOTE {0}",
     "Rating (highest first)": "Note (la plus haute d'abord)", "One shelf per artist, folder or playlist": "Une étagère par artiste, dossier ou playlist",

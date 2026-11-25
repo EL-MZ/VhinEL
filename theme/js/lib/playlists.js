@@ -16,6 +16,100 @@ function plItems(pl) {
 // pl undefined: every playlist (playlists were added, removed or reordered, so the indexes moved)
 function plDirty(pl) { if (pl === undefined) PL_CACHE.clear(); else PL_CACHE.delete(pl); }
 
+const TRACK_DROP_PREFIX = "RhinE · Drop · ";
+function canReceiveTracks(pl) {
+    if (!Number.isInteger(pl) || pl < 0 || pl >= plman.PlaylistCount || plman.IsAutoPlaylist(pl) || plman.IsPlaylistLocked(pl)) return false;
+    const name = plman.GetPlaylistName(pl);
+    return !OWN_PLAYLISTS.has(name) && !name.startsWith(TRACK_DROP_PREFIX);
+}
+
+// Keep the first occurrence in playlist order, including distinct subsongs of the same file.
+function uniquePlaylistTracks(items, existing = null) {
+    const key = h => h.RawPath + "\0" + h.SubSong;
+    const seen = new Set(), added = fb.CreateHandleList();
+    if (existing) for (let i = 0; i < existing.Count; i++) seen.add(key(existing[i]));
+    for (let i = 0; i < items.Count; i++) {
+        const h = items[i], id = key(h);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        added.Add(h);
+    }
+    return added;
+}
+
+function appendUniqueTracks(pl, items) {
+    if (!items || !items.Count || !canReceiveTracks(pl)) return 0;
+    const existing = plman.GetPlaylistItems(pl), added = uniquePlaylistTracks(items, existing);
+    if (!added.Count) return 0;
+    plman.UndoBackup(pl);
+    plman.InsertPlaylistItems(pl, existing.Count, added, false);
+    return added.Count;
+}
+
+function newNamedPlaylist(suggestedName = "") {
+    let name;
+    try { name = utils.InputBox(window.ID, tr("Playlist name"), tr("New playlist"), suggestedName, true); } catch (e) { return -1; }
+    name = (name || "").trim();
+    if (!name || OWN_PLAYLISTS.has(name) || name.startsWith(TRACK_DROP_PREFIX)) return -1;
+    return plman.CreatePlaylist(plman.PlaylistCount, name);
+}
+
+// JSplitter resolves native drag data by inserting it into a playlist. Import into a temporary playlist
+// first so the caller can use the handles without adding them to an unrelated playlist or changing selection.
+function trackDropReceiver() {
+    const timeout = 60000;
+    let pending = null;
+
+    function finish(drop, expired = false) {
+        if (pending !== drop) return;
+        const stage = plman.FindPlaylist(drop.name);
+        const items = stage >= 0 ? plman.GetPlaylistItems(stage) : null;
+        if (items && !items.Count && !expired) return;
+        pending = null;
+        window.ClearTimeout(drop.timer);
+        if (!items) return;
+        if (items.Count && drop.consume(items) && stage !== plman.ActivePlaylist) {
+            plman.ClearPlaylist(stage);
+            plman.RemovePlaylist(stage);
+            return;
+        }
+        // Keep tracks if they could not be delivered, or if the user dropped them to make a new playlist.
+        // Keep an expired import in place in case the native insertion is still in flight.
+        const unique = uniquePlaylistTracks(items);
+        if (unique.Count !== items.Count) {
+            plman.ClearPlaylist(stage);
+            plman.InsertPlaylistItems(stage, 0, unique, false);
+        }
+        plman.RenamePlaylist(stage, tr("New playlist"));
+    }
+
+    return {
+        busy: () => !!pending,
+        start(action, consume) {
+            if (pending) return false;
+            const now = Date.now();
+            // Only one native insertion can be in flight across panels. Removing another import would move its index.
+            for (let i = plman.PlaylistCount - 1; i >= 0; i--) {
+                const name = plman.GetPlaylistName(i);
+                if (name.startsWith(TRACK_DROP_PREFIX) && now - Number(name.slice(TRACK_DROP_PREFIX.length)) < timeout) return false;
+            }
+            const name = TRACK_DROP_PREFIX + now;
+            const stage = plman.CreatePlaylist(plman.PlaylistCount, name);
+            const drop = { name, consume, timer: 0 };
+            pending = drop;
+            drop.timer = window.SetTimeout(() => finish(drop, true), timeout);
+            action.Playlist = stage;
+            action.Base = 0;
+            action.ToSelect = false;
+            return true;
+        },
+        added(i) {
+            const drop = pending;
+            if (drop && i < plman.PlaylistCount && plman.GetPlaylistName(i) === drop.name) window.SetTimeout(() => finish(drop), 0);
+        }
+    };
+}
+
 // total length and size of a playlist, cached with its items. The length is added up from title formatting, not
 // CalcTotalDuration: a song of 05 ONLINE not opened yet has no length of its own in the handle (its playlist line has
 // one), and JSplitter hands back whatever is in that memory as a number, which can be garbage (1e+195 h) or a value

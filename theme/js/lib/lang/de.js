@@ -366,6 +366,8 @@ I18N["de"] = {
     "Colour": "Farbe", "Black": "Schwarz", "White": "Weiß", "Follow light / dark": "Wie Hell / Dunkel",
     // playlists: play on double-click, the theme's own playlists tagged
     "Play playlist": "Playlist abspielen", "THEME": "THEME",
+    "Add selected tracks here": "Ausgewählte Titel hier hinzufügen",
+    "QUEUE IS EMPTY": "WARTESCHLANGE IST LEER", "ADD TO QUEUE": "ZUR WARTESCHLANGE", "ADDED TO QUEUE": "ZUR WARTESCHLANGE HINZUGEFÜGT", "Move up": "Nach oben", "Move down": "Nach unten",
     // archive: group by artist or rating, sort by rating, one shelf per artist or folder
     "INITIAL": "BUCHSTABE", "Group by artist": "Nach Künstler gruppieren", "Group by rating": "Nach Wertung gruppieren", "RATING {0}": "WERTUNG {0}",
     "Rating (highest first)": "Wertung (höchste zuerst)", "One shelf per artist, folder or playlist": "Ein Regal pro Künstler, Ordner oder Playlist",

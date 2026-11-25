@@ -59,7 +59,7 @@ RELOAD_ON_LANG = false;   // see lib/bus.js
 const P = {};          // child name -> PanelObject
 let ready = false;
 
-const broadcast = () => send("state", { view: STATE.view, preset: STATE.preset, reduce: STATE.reduce, boot: STATE.boot, skin: STATE.skin, grain: STATE.grain,
+const broadcast = () => send("state", { view: STATE.view, preset: STATE.preset, reduce: STATE.reduce, boot: STATE.boot, skin: STATE.skin, grain: STATE.grain, queueOpen: STATE.queueOpen,
                                    lyricsSource: STATE.lyricsSource, lyricsTrans: STATE.lyricsTrans, lyricsNeteaseAuto: STATE.lyricsNeteaseAuto, lyricsRoma: STATE.lyricsRoma,
                                    textScale: STATE.textScale, arrayScale: STATE.arrayScale, inspectScale: STATE.inspectScale, floor: STATE.floor, wallpaper: STATE.wallpaper,
                                    halftone: STATE.halftone, halftoneLevel: STATE.halftoneLevel, emblem: STATE.emblem, tag: STATE.tag,
@@ -134,7 +134,12 @@ function regions() {
     const top = dp(M.header), bottom = H - dp(M.transport + M.status), vh = bottom - top;
     const r = { header: [0, 0, W, top], transport: [0, bottom, W, H - bottom] };
     // Archive, Lyrics and Signal are all drawn by the stage panel
-    if (STATE.view !== "playlists") return Object.assign(r, { stage: [0, top, W, vh] });
+    if (STATE.view !== "playlists") {
+        const queueWidth = STATE.queueOpen ? Math.min(dp(side("card") + 2 * M.gutter), Math.floor(W * .4)) : 0;
+        r.stage = [0, top, W - queueWidth, vh];
+        if (queueWidth) r.card = [W - queueWidth, top, queueWidth, vh];
+        return r;
+    }
     // the manager panel also draws the track rail along the playlist's left edge
     // the list (as wide as the user set it) widens with the text size; the native playlist keeps at least 320 dp,
     // both sides giving way to it
@@ -368,6 +373,13 @@ onMessage("tip", t => {
     if (P.tip.Hidden) P.tip.Show(true);
 });
 onMessage("view", v => setView(v));
+onMessage("queue-open", on => {
+    const open = typeof on === "boolean" ? on : !STATE.queueOpen;
+    if (open === STATE.queueOpen) return;
+    STATE.queueOpen = open;
+    layout();
+    broadcast();
+});
 onMessage("mode", toggleMode);
 onMessage("mode-to", setModeTo);
 onMessage("borderless", toggleBorderless);

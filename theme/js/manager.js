@@ -3,13 +3,15 @@
 //   manager  PLAYLISTS ……… 06, then one 26 dp row per playlist: a rail line whose length is log(item count), number,
 //            name, count. The active playlist is inverted with an orange square; the playing one has an orange tab.
 //            Click activates, double-click plays (lib/playlists.js playPlaylist), drag reorders, right-click: play / new /
-//            rename / duplicate / remove. The theme's own playlists (lib/bus.js OWN_PLAYLISTS) are muted and tagged THEME.
+//            add selected tracks / rename / duplicate / remove. The theme's own playlists are muted and tagged THEME.
 //   rail     INDEX and the track count, then one 2 dp line per track of the active playlist (13 dp apart; a long playlist is spread
 //            over the lines, each standing for an equal share). Hover raises a bell-shaped wave and shows the hover
 //            card (tip.js, placed by frame.js over the playlist); click selects and scrolls to the track, double-click
 //            plays it. The playing track's line and the selected (focused) track's line are orange, at rest length.
 //            Nothing moves while the mouse holds still.
 // Keys while focused: ↑ ↓ switch playlists, Enter play, F2 rename, Delete remove, Ctrl+N new; the shared keys otherwise.
+
+window.DefineScript("RhinE Playlist Manager", { features: { drag_n_drop: true } });
 
 include(fb.ProfilePath + "themes\\audio-archive\\js\\lib\\core.js");
 include(fb.ProfilePath + "themes\\audio-archive\\js\\lib\\playlists.js");
@@ -197,8 +199,11 @@ function railJump(k, play) {
 
 function playlistMenu(x, y, i) {
     const menu = window.CreatePopupMenu();
+    const from = plman.ActivePlaylist;
+    const selected = from >= 0 && from !== i && canReceiveTracks(i) ? plman.GetPlaylistSelectedItems(from) : null;
     if (i >= 0) {
         menu.AppendMenuItem(plman.PlaylistItemCount(i) ? 0 : 1, 7, tr("Play playlist"));
+        menu.AppendMenuItem(selected && selected.Count ? 0 : 1, 8, tr("Add selected tracks here"));
         menu.AppendMenuSeparator();
     }
     menu.AppendMenuItem(0, 1, tr("New playlist"));
@@ -218,6 +223,7 @@ function playlistMenu(x, y, i) {
     else if (id === 5) plman.ShowAutoPlaylistUI(i);
     else if (id === 6) removeInstrumentals(i);
     else if (id === 7) playPlaylist(i);
+    else if (id === 8) appendUniqueTracks(i, selected);
 }
 
 // --------------------------------------------------------------------------------------------------- mouse
@@ -318,28 +324,35 @@ function on_mouse_wheel(step) {
 // playlist under the mouse; below the rows they make a new playlist. Autoplaylists, locked playlists and the theme's
 // own (lib/bus.js OWN_PLAYLISTS) take none. The tracks stay where they came from: always a copy.
 let dropRow = -2;            // -2: nothing dragged over the list, -1: a new playlist, else the playlist's index
+const playlistDrops = trackDropReceiver();
 function dropTarget(x, y) {
     if (x >= MW() || y < TOP()) return -2;
     const a = hits.at(x, y);
     if (!a || a.id !== "pl") return -1;
     const i = a.data;
-    return plman.IsAutoPlaylist(i) || plman.IsPlaylistLocked(i) || OWN_PLAYLISTS.has(plman.GetPlaylistName(i)) ? -2 : i;
+    return canReceiveTracks(i) ? i : -2;
 }
-const dropEffect = (action, t) => t === -2 ? 0 : action.Effect & 1 ? 1 : action.Effect & 4;   // copy, else link (some sources allow only that)
+const dropEffect = (action, t) => t === -2 || playlistDrops.busy() ? 0 : action.Effect & 1 ? 1 : action.Effect & 4;   // copy, else link
 function dropMark(t) { if (t !== dropRow) { dropRow = t; window.RepaintRect(0, 0, MW(), H); } }
-function on_drag_enter(action, x, y) { const t = dropTarget(x, y); action.Effect = dropEffect(action, t); dropMark(t); }
-function on_drag_over(action, x, y) { const t = dropTarget(x, y); action.Effect = dropEffect(action, t); dropMark(t); }
+function on_drag_over(action, x, y) {
+    const t = dropTarget(x, y);
+    action.Effect = dropEffect(action, t);
+    dropMark(action.Effect ? t : -2);
+}
+function on_drag_enter(action, x, y) { on_drag_over(action, x, y); }
 function on_drag_leave() { dropMark(-2); }
 function on_drag_drop(action, x, y) {
     const t = dropTarget(x, y), effect = dropEffect(action, t);
     drag = null;             // the mouse-up that would end a reorder does not arrive after a drop
     dropMark(-2);
     if (!effect) { action.Effect = 0; return; }
-    const to = t >= 0 ? t : plman.CreatePlaylist(plman.PlaylistCount, "");
-    action.Playlist = to;
-    action.Base = plman.PlaylistItemCount(to);
-    action.ToSelect = false; // the playlist on screen stays
-    action.Effect = effect;
+    const name = t >= 0 ? plman.GetPlaylistName(t) : null;
+    const accepted = playlistDrops.start(action, items => {
+        if (!canReceiveTracks(t) || plman.GetPlaylistName(t) !== name) return false;
+        appendUniqueTracks(t, items);
+        return true;
+    });
+    action.Effect = accepted ? effect : 0;
 }
 
 // ---------------------------------------------------------------------------------------------------- keys
@@ -366,7 +379,12 @@ function on_key_down(vk) {
 function refresh() { railDirty(); if (railHover >= 0) showTip(railHover); clock.wake(); window.Repaint(); }
 function on_playlists_changed() { plDirty(); refresh(); }
 function on_playlist_switch() { lens.length = 0; railHover = -1; sendTip(null); refresh(); }
-function on_playlist_items_added(i) { plDirty(i); if (i === plman.ActivePlaylist) lens.length = 0; refresh(); }
+function on_playlist_items_added(i) {
+    plDirty(i);
+    if (i === plman.ActivePlaylist) lens.length = 0;
+    refresh();
+    playlistDrops.added(i);
+}
 function on_playlist_items_removed(i) { plDirty(i); if (i === plman.ActivePlaylist) lens.length = 0; refresh(); }
 function on_playlist_items_reordered(i) { plDirty(i); refresh(); }
 function on_playback_new_track() { refresh(); }
