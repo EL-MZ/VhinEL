@@ -1,0 +1,23 @@
+{
+  "host": "2.26",
+  "room inspection": true,
+  "room partial pull": true,
+  "room reverse": true,
+  "room miss does not play": true,
+  "array inspection": true,
+  "array partial pull": true,
+  "array reverse": true,
+  "array miss does not play": true,
+  "tilt projection": true,
+  "silent before contact": true,
+  "drop started fixture in foobar": true,
+  "archive playlist": true,
+  "idle screensaver": true,
+  "escape keeps playback": true,
+  "pause holds label": true,
+  "resume": true,
+  "switched to playlists": true,
+  "transport opens Now Spinning from Playlists": true,
+  "restored Playlists while playing": true,
+  "passed": true
+}

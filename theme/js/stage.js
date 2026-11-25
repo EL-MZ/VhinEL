@@ -18,6 +18,7 @@ include(fb.ProfilePath + "themes\\audio-archive\\js\\archive.js");
 include(fb.ProfilePath + "themes\\audio-archive\\js\\artist.js");
 include(fb.ProfilePath + "themes\\audio-archive\\js\\grid.js");
 include(fb.ProfilePath + "themes\\audio-archive\\js\\room.js");
+include(fb.ProfilePath + "themes\\audio-archive\\js\\vinyl.js");
 include(fb.ProfilePath + "themes\\audio-archive\\js\\customcase.js");
 include(fb.ProfilePath + "themes\\audio-archive\\js\\style.js");
 include(fb.ProfilePath + "themes\\audio-archive\\js\\signal.js");
@@ -189,12 +190,12 @@ function npChanged(same, h, what) {
 
 // the archive's file panel marks the playing track
 const playingChanged = () => { AR.tracks.key = ""; AR.listVer++; AR.dirtyInfo = true; AF.dirty = true; inspectFollow(); if (STATE.view === "archive") window.Repaint(); };
-function on_playback_new_track() { loadTrack(); playingChanged(); onlineTrack(); signalNewTrack(); if (STATE.view === "online") window.Repaint(); }
+function on_playback_new_track() { VPLAYER.trackAt=performance.now(); vinylAlbumTiming(); loadTrack(); playingChanged(); onlineTrack(); signalNewTrack(); if (STATE.view === "online") window.Repaint(); }
 function on_playback_starting() { clock.wake(); }
-function on_playback_pause(paused) { signalPaused(paused); dirty.card = true; clock.wake(); window.Repaint(); }
-function on_playback_stop(reason) { if (reason !== 2) { loadTrack(); playingChanged(); } }
-function on_volume_change() { if (STATE.mini) window.Repaint(); }   // (the mini player's fader)
-function on_playback_seek() { lyrIdx = -2; clock.wake(); }
+function on_playback_pause(paused) { vinylSpin(); signalPaused(paused); dirty.card = true; clock.wake(); window.Repaint(); }
+function on_playback_stop(reason) { if (reason !== 2) { vinylWakeScreen(); vinylReset(); VPLAYER.spinAt=null; loadTrack(); playingChanged(); } }
+function on_volume_change() { VPLAYER.idle=Date.now(); if (STATE.mini) window.Repaint(); }   // (the mini player's fader)
+function on_playback_seek() { VPLAYER.idle=Date.now(); lyrIdx = -2; clock.wake(); }
 function on_playback_queue_changed() { if (T.handle) { T.next = nextTitle(); dirty.left = dirty.card = true; window.Repaint(); } }
 function on_playlist_items_reordered(i) { plDirty(i); }
 function on_item_focus_change() { if (!fb.IsPlaying) loadTrack(); }
@@ -231,13 +232,21 @@ const clock = Clock((dt, now) => {
         return playing || MINI.level[0] > .01 || MINI.level[1] > .01;
     }
     if (STATE.view === "archive") {
+        if (VPLAYER.screen) {
+            if (now-VPLAYER.lastPaint>=32) { window.Repaint(); VPLAYER.lastPaint=now; }
+            return !fb.IsPaused || now-VPLAYER.entered<5000;
+        }
         let more = archiveUpdate(dt);
+        const vinylMoving = vinylUpdate();
         if (AR.layout === "grid") more = gridUpdate(dt) || more;
         else if (AR.layout === "room") more = roomUpdate(dt) || more;
         const settling = !!archiveQueueSettle;
         if (settling && tweenK(archiveQueueSettle.tw) >= 1) archiveQueueSettle = null;
-        window.RepaintRect(0, 0, AR.dirtyInfo || settling ? W : arrayW(), H);
-        return more || !!archiveQueueSettle;
+        if (more || settling || !vinylMoving || now - VPLAYER.lastPaint >= 32) {
+            window.RepaintRect(0, 0, AR.dirtyInfo || settling ? W : arrayW(), H);
+            VPLAYER.lastPaint=now;
+        }
+        return more || vinylMoving || !!archiveQueueSettle;
     }
     // 05 ONLINE: its now-playing column (the time) twice a second while playing
     if (STATE.view === "online") {
@@ -276,6 +285,12 @@ onMessage("state", () => {
     const on = STATE.view === "archive";
     if (!on || STATE.mini) { archiveQueueSwipe = null; archiveQueueSettle = null; }
     const shown = on && !ARCHIVE_ON;
+    if (shown) VPLAYER.idle=Date.now();
+    if (!on || STATE.mini) {
+        vinylReset(); vinylTurnFrames.clear(); vinylBitmaps.clear();
+        VPLAYER.label=VPLAYER.labelSource=null;
+        VPLAYER.screen=false; VPLAYER.previousView=null;
+    }
     if (on !== ARCHIVE_ON) { ARCHIVE_ON = on; if (on) requestVisibleThumbs(); else archiveHidden(); }
     // GROUP › ONLINE: the NetEase lists asked for again when the Archive is shown, and while it stays shown once it is
     // time (lib/onlarchive.js: every 30 minutes at most; a list not read yet is asked for only when it is shown again)
@@ -324,6 +339,7 @@ TOKEN_LISTENERS.push(() => { dirty.left = dirty.card = true; });
 
 function on_paint(gr) {
     hits.clear();
+    if (STATE.view==="archive" && !STATE.mini && VPLAYER.screen) { vinylScreenPaint(gr); return; }
     gr.FillSolidRect(0, 0, W, H, C.bg);
     // the wallpaper (lib/wallpaper.js) where it is on: LABEL_LIVE then also tells the views they draw over it
     LABEL_LIVE = STATE.view !== "style" && wallpaperOn(STATE.view) && drawWallpaper(gr, "stage", 0, 0, W, H);
@@ -751,6 +767,9 @@ function settleArchiveQueueSwipe(swipe, added) {
 }
 
 function on_mouse_lbtn_down(x, y, mask) {
+    if (vinylWakeScreen()) { VPLAYER.dismissUp=true; return; }
+    VPLAYER.dismissUp=false;
+    if (vinylDown(x,y)) { archiveQueueSwipe=null; return; }
     archiveQueueSwipe = null;
     if (archiveQueueSettle) { archiveQueueSettle = null; window.Repaint(); }
     if (STATE.mini) { miniDown(x, y); return; }
@@ -763,7 +782,7 @@ function on_mouse_lbtn_down(x, y, mask) {
     if (STATE.view === "archive" && AR.layout !== "grid" && a && a.id === "ar-ruler") rulerDown(x);
     if (STATE.view === "archive" && a && a.id === "art-bar") artBarDown(y, a);
     if (STATE.view === "online" && a && a.id === "onl-bar") onlBarDown(y, a);
-    if (STATE.view === "archive" && (!a || ["ar-track", "art-trk", "art-alb"].includes(a.id))) {
+    if (STATE.view === "archive" && !(AR.inspOn && x<arrayW()) && (!a || ["ar-track", "art-trk", "art-alb"].includes(a.id))) {
         const target = menuTarget(x, y, false);
         if (target && target.list && target.list.Count) {
             archiveQueueSwipe = { x, y, hit: a, title: target.name || TF_MENU_TITLE.EvalWithMetadb(target.list[0]),
@@ -772,6 +791,8 @@ function on_mouse_lbtn_down(x, y, mask) {
     }
 }
 function on_mouse_move(x, y, mask) {
+    if (vinylWakeScreen()) return;
+    if (VPLAYER.grip) { if (mask & 1) vinylMove(x,y); else vinylRelease(true); return; }
     if (STATE.mini) { miniMouseMove(x, mask, hits.at(x, y), y); return; }
     // (a drag whose button went up outside the panel ends at the next move)
     if (GRID.drag) { if (mask & 0x0001) gridBarMove(y); else gridBarUp(); return; }
@@ -800,6 +821,7 @@ function on_mouse_move(x, y, mask) {
     if (fh !== NP_FAV.hover) { NP_FAV.hover = fh; dirty.card = true; window.Repaint(); }
 }
 function on_mouse_leave() {
+    if (VPLAYER.grip) vinylRelease(true);
     if (archiveQueueSwipe) {
         const swipe = archiveQueueSwipe;
         archiveQueueSwipe = null;
@@ -812,6 +834,7 @@ function on_mouse_leave() {
     if (hover) { hover = null; if (STATE.view === "lyrics" || STATE.view === "signal") window.Repaint(); }
 }
 function on_mouse_lbtn_dblclk(x, y) {
+    if (vinylWakeScreen() || VPLAYER.grip) return;
     // the mini player: a double-click off its keys goes back to the full window
     if (STATE.mini) { if (!hits.at(x, y)) send("mini", false); return; }
     // an edge: its column back to the width it came with
@@ -824,8 +847,9 @@ function on_mouse_lbtn_dblclk(x, y) {
     if (STATE.view === "archive" && AR.layout !== "grid" && (!hits.at(x, y) || AR.lastClick)) archiveDoubleClick();
     else if (STATE.view === "archive" && AR.layout === "grid" && !hits.at(x, y)) gridDblClick(x, y);
 }
-function on_mouse_wheel_h(step) { if (STATE.view === "archive") archiveWheelH(step); }   // a sideways wheel: shelves
+function on_mouse_wheel_h(step) { if (vinylWakeScreen()) return; if (STATE.view === "archive") archiveWheelH(step); }   // a sideways wheel: shelves
 function on_mouse_wheel(step) {
+    if (vinylWakeScreen()) return;
     if (STATE.mini) { miniWheel(step); return; }   // the mini player: the volume
     if (STATE.view === "archive") { archiveWheel(step); return; }
     if (STATE.view === "style") { styleWheel(step); return; }
@@ -837,6 +861,7 @@ function on_mouse_wheel(step) {
     }
 }
 function on_mouse_rbtn_up(x, y, mask) {
+    if (vinylWakeScreen()) return true;
     if (mask & 0x0004) return false;   // Shift: JSplitter's own menu
     if (STATE.mini) { miniMenu(x, y); return true; }
     if (STATE.view === "archive") { archiveMenu(x, y); return true; }
@@ -846,6 +871,8 @@ function on_mouse_rbtn_up(x, y, mask) {
     return false;
 }
 function on_mouse_lbtn_up(x, y) {
+    if (VPLAYER.dismissUp) { VPLAYER.dismissUp=false; return; }
+    if (VPLAYER.grip) { vinylMove(x,y); vinylRelease(false); return; }
     if (STATE.mini) { miniClick(x, hits.at(x, y)); return; }
     if (SIDE_DRAG) { sideEnd(x); return; }
     if (GRID.drag) { gridBarUp(); return; }
@@ -895,6 +922,8 @@ function on_char(code) { if (!styleChar(code)) searchChar(code); }
 function on_download_file_done(path, success) { if (lyricsDownloaded(path, success)) window.Repaint(); else if (!onlineDownloaded(path, success)) artistDownloaded(path, success); }
 function on_locations_added(task, handles) { libLocationsAdded(task, handles); }   // CUE sheets read for the archive (lib/library.js)
 function on_key_down(vk) {
+    if (vinylWakeScreen()) return;
+    if (VPLAYER.grip && vk===0x1B) { vinylRelease(true); return; }
     if (STATE.mini) { if (vk === 0x20) fb.PlayOrPause(); else if (vk === 0x1B) send("mini", false); else globalKey(vk); return; }   // Space, Esc
     if (styleKey(vk)) return;   // the text size being typed (style.js)
     if (searchKey(vk)) return;

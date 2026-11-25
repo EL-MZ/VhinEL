@@ -39,7 +39,7 @@ const ROOM_LIGHT_FALL = { "": .75 };
 // polymer, jade glass, or the white and blackout cases, each of those two in one of its lights: ROOM LIGHT; roomSet()
 // in lib/bus.js), the dark ones when the mode has none.
 function roomAssets() {
-    const set = roomSet(), want = set + "|" + MODE;
+    const vinyl = vinylAssets(), set = roomSet(), want = set + "|" + MODE;
     if (ROOM.forMode === want) return ROOM.meta;   // (looked for once per material and mode, not on every paint)
     ROOM.forMode = want;
     const has = (m, md) => utils.IsFile(`${ROOM_ROOT}${m}\\${md}\\room.json`);
@@ -50,7 +50,8 @@ function roomAssets() {
     ARIMG.faded.clear();   // (the faded copies of the set before: a node set has hundreds)
     try {
         ROOM.meta = JSON.parse(utils.ReadTextFile(ROOM.dir + "room.json", 65001));
-        ROOM.img = { plate: d2d.Image(ROOM.dir + "plate.jpg"), sel: d2d.Image(ROOM.dir + "sel.png"), rest: new Map(), node: new Map(),
+        if (vinyl) ROOM.meta = vinylRoomMeta(ROOM.meta,vinyl.room);
+        ROOM.img = { plate: d2d.Image(ROOM.dir + "plate.jpg"), sel: vinyl ? vinylImage(ROOM.meta.sel.sprite) : d2d.Image(ROOM.dir + "sel.png"), rest: new Map(), node: new Map(),
             valley: ROOM.meta.valley && utils.IsFile(ROOM.dir + "valley.png") ? d2d.Image(ROOM.dir + "valley.png") : null };
     } catch (e) { ROOM.meta = ROOM.img = null; console.log("audio-archive room: " + e); }
     return ROOM.meta;
@@ -65,7 +66,7 @@ function roomLevel(d) {
     let img = ROOM.img.rest.get(n);
     if (!img) {
         img = {};
-        for (const k of [...ROOM_FACES.map(([f]) => f), "haze"]) { try { img[k] = d2d.Image(`${ROOM.dir}rest-L${n}-${k}.png`); } catch (e) { img[k] = null; } }
+        for (const k of [...ROOM_FACES.map(([f]) => f), "haze"]) { try { img[k] = vinylAssets() ? vinylImage((k === "haze" ? L[n].haze : L[n].layers[k]).sprite) : d2d.Image(`${ROOM.dir}rest-L${n}-${k}.png`); } catch (e) { img[k] = null; } }
         ROOM.img.rest.set(n, img);
     }
     return { S: L[n], img, name: "room-rest" + n };
@@ -272,12 +273,11 @@ function drawRoom(gr) {
         if (h !== AR.hover || hg !== AR.hoverRow) { AR.hover = h; AR.hoverRow = hg; clock.wake(); }
     }
     // the plates led out of the cover's top corner (drawCasePlate measures from the array's cover: given that corner)
-    const top = CASE_META.array.cover[1];
-    const plateText = (a, txt) => { const t = [...(txt || a.title || tr("UNTITLED"))]; return t.length > 40 ? t.slice(0, 39).join("") + "…" : t.join(""); };
-    if (selAt && turn === 0) drawCasePlate(gr, selAt.a, selAt.x - top[0], selAt.y - top[1], 1, 255, plateText(selAt.a));
+    const top = (vinylAssets() ? vinylArray() : CASE_META.array).cover[1];
+    if (selAt && turn === 0) drawCasePlate(gr, selAt.a, selAt.x - top[0], selAt.y - top[1], 1, 255, casePlateTitle(selAt.a));
     if (AR.hoverPlate) {
         const h = AR.hoverPlate;
-        drawCasePlate(gr, h.a, h.x - top[0], h.y - top[1], 1, h.alpha, plateText(h.a, h.txt));
+        drawCasePlate(gr, h.a, h.x - top[0], h.y - top[1], 1, h.alpha, h.txt || casePlateTitle(h.a));
         AR.hoverPlate = null;
     }
     // the room dissolves into the page towards the album file and the controls, as the array does
@@ -358,12 +358,16 @@ function drawRoomCase(gr, it, RG) {
         // the case's sprites: the nodes round its place (blended: each over the ones before it by its share), else the
         // shared one rendered at its distance
         const Ls = roomNodes(it.x, it.y) || [{ ...roomLevel(roomProject(it.x, it.y, it.z + ROOM.meta.box[2] / 2)[2]), w: 1 }];
-        const w = it.haze || 0, a = Math.round(alpha * (1 - cl) * (1 - w));
+        const vinyl = vinylAssets(), w = vinyl && it.c ? 0 : it.haze || 0;
+        const a = Math.round(alpha * (1 - cl) * (1 - w));
         // the window, under the case's glass (the sprites' window is a hole): the cover where the camera sees it
         const aw0 = Math.round(alpha * (1 - cl)), win = roomWindow(it.x, it.y, it.z, RG), t = it.c && ROOM.want.has(coverKey(it.a)) ? thumbOf(it.a) : null;
         // (tinted as archive.js tintedCover does it: a thin bright edge otherwise, flickering as the shelves move)
         // (RHINE LAB's cases at rest are opaque and hold no cover: only the selected one shows it)
-        if (!ROOM.meta.sealed) tintedCover(gr, win, 0, 0, 1, aw0, f > 0 ? Math.min(fogTop, f + (1 - f) * .35 * w) : 0, t ? (AR.frost || w > .5 ? t.blur : t.img) : null);
+        if (!ROOM.meta.sealed) {
+            const art = vinyl ? (t && t.img || (it.c && vinylImage(vinyl.fallback))) : t && (AR.frost || w > .5 ? t.blur : t.img);
+            tintedCover(gr, win, 0, 0, 1, aw0, f > 0 ? Math.min(fogTop, f + (1 - f) * .35 * w) : 0, art);
+        }
         let acc = 0;
         for (const L of Ls) {
             acc += L.w;
@@ -401,8 +405,8 @@ function drawRoomCase(gr, it, RG) {
         Q = Sel.cover.map(map);
         const big = it.isSel ? cover(albumFirst(it.a), () => window.Repaint()) : null, t = thumbOf(it.a);
         const img = big && big.img ? big.img : t ? t.img : null, a = Math.round(alpha * cl);
-        tintedCover(gr, Q, 0, 0, 1, a, f, img);
-        roomDraw(gr, I.sel, "room-sel" + ROOM.dir, f, roomRect(map, 0, 0, Sel.size[0], Sel.size[1]), a);
+        tintedCover(gr, Q, 0, 0, 1, a, f, img || (vinylAssets() && vinylImage(vinylAssets().fallback)));
+        roomDraw(gr, I.sel, "room-sel" + ROOM.dir, f, roomRect(map, ...(Sel.sprite ? Sel.sprite.crop : [0, 0, ...Sel.size])), a);
         // (a case whose label takes the album: RHINE LAB's, its paper blank in the sprite)
         if (Sel.info && it.isSel) drawInfoLabel(gr, Sel.info.map(map), albumInfoLabel(it.a), Math.round(a * (1 - f)));
     }

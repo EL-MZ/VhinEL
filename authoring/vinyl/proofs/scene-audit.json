@@ -1,0 +1,27 @@
+{
+  "scene": "VHINEL Vinyl Archive",
+  "version": "5.0.1",
+  "objects": 123,
+  "openingFrame": 42,
+  "markers": {
+    "Inspect": 1,
+    "Half extracted": 23,
+    "Free": 42,
+    "Above spindle": 63,
+    "Seated": 82,
+    "Stylus contact": 134,
+    "Playing": 149
+  },
+  "packedImagesSHA256": {
+    "bright.png": "ecd4462f9f67d7ea52556644cc52768c0f526620a616514df121c48b17e57f91",
+    "calibration.png": "8e61b2e670c77309203c0fb7f5ab27e062470daf03937f6434f671bee486eadc",
+    "dark.png": "1f53f4efb736b6fb40eb978f70728af5b1ecfde517b44aaeca97c1dc419b3c25",
+    "missing.png": "85d64ffbba389b1fd9a48bc3e17478f9aa517c80ab671247584fc9f985c1a1b0",
+    "side-a.png": "c30380321e587b52c3be9bf7db9e174bb8e7b1d72105e19faaa9a61f98e95646",
+    "side-b.png": "7a77f171038d394f9c08152cf288762a2b8066383c5c88120a1d9dc316fd7ab5"
+  },
+  "wordmark": "VHINEL",
+  "labelDiameterMm": 98,
+  "labelBoreMm": 7.3,
+  "squareShadowVisible": false
+}

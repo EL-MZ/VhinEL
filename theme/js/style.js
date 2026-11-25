@@ -698,7 +698,7 @@ function displayGroups() {
         { title: "TEXT", rows: [{ title: "SIZE", kind: "size" }, row("FONT", FONTS.filter(([id]) => FONT_FAMILIES[id].ok), STATE.font, "sty-font")] },
         { title: "ARCHIVE", rows: [row("ARRAY", sc(ARRAY_SCALES), STATE.arrayScale, "sty-array"), row("INSPECT", sc(INSPECT_SCALES), STATE.inspectScale, "sty-inspect"),
                                    row("FLOOR", FLOORS, STATE.floor, "sty-floor"), ...(hearthOffer() ? [{ title: "", kind: "hearth" }] : []),
-                                   row("GLASS", [["frost", "FROST"], ["clear", "CLEAR"]], AR.frost ? "frost" : "clear", "sty-glass")] },
+                                   ...(!vinylAssets() ? [row("GLASS", [["frost", "FROST"], ["clear", "CLEAR"]], AR.frost ? "frost" : "clear", "sty-glass")] : [])] },
         { title: "PAGE", rows: [{ title: "WALLPAPER", kind: "wallpaper" }, row("HALFTONE", HALFTONES, STATE.halftone, "sty-ht"),
                                 row("DOTS", HALFTONE_LEVELS, STATE.halftoneLevel, "sty-htl", STATE.halftone === "off"), row("EMBLEM", EMBLEMS, STATE.emblem, "sty-emblem"),
                                 row("WINDOW", [["window", "NORMAL"], ["borderless", "BORDERLESS"]], STATE.borderless ? "borderless" : "window", "sty-window")] },

@@ -6,6 +6,7 @@
 // the active case skin (lib/skins.js): its folder and case.json; CASE_LISTENERS run after a switch
 let CASE_SKIN = "", CASE_DIR = "", CASE_META = null;
 const CASE_LISTENERS = [];
+include(fb.ProfilePath + "themes\\audio-archive\\js\\lib\\vinyl-assets.js");
 function loadSkin(id) {
     const s = findSkin(id);
     if (!s || s.dir === CASE_DIR) return false;
@@ -175,6 +176,7 @@ function drawHeroRoom(gr, R, x, y, w, h, cov, clearK, no, info) {
 }
 // the hero case fitted into (x, y, w, h); clearK 0 = frosted, 1 = clear; no = album number printed on the label
 function drawHeroCase(gr, x, y, w, h, cov, clearK, no, info = null) {
+    if (vinylAssets()) return vinylHero(gr,x,y,w,h,cov);
     const R = heroRoom();
     if (R) { drawHeroRoom(gr, R, x, y, w, h, cov, clearK, no, info); return; }
     const I = heroImages(), [iw, ih] = CASE_META.hero_res, m = CASE_META.hero;

@@ -1,0 +1,209 @@
+{
+  "packFiles": 124,
+  "pngCount": 123,
+  "bytes": 15341863,
+  "decodedActiveRGBABytes": 14178980,
+  "activeLayers": [
+    "deck/base.png",
+    "deck/spindle.png",
+    "deck/contact.png",
+    "deck/seated.png",
+    "deck/arm-contact.png",
+    "transfer/side-a.png",
+    "transfer/front.png",
+    "transfer/rear.png"
+  ],
+  "worstAdjacentInspectionPairRGBABytes": 10961696,
+  "decodedAllRGBABytes": 392772192,
+  "inspectionFrames": 60,
+  "transferSamples": 12,
+  "armPoses": 11,
+  "roomDepths": [
+    36.0,
+    45.0,
+    56.0,
+    70.0,
+    88.0,
+    110.0
+  ],
+  "seatedErrorDisplayPx": 0.0,
+  "inspectionHandoffCornerErrorDisplayPx": 1e-05,
+  "contactRadiusMm": 140.291,
+  "contactClearanceMm": 0.0,
+  "liftedSwingClearanceMm": 20.361,
+  "seatedBoreAlphaAtAnchor": 0,
+  "spindleAlphaAtAnchor": 255,
+  "spinPeriodSeconds": 1.8,
+  "cancelAndMissReturnPixelExact": true,
+  "pauseHoldsPixelExact": true,
+  "fullRevolutionClosesPixelExact": true,
+  "representativeRerenders": [
+    {
+      "png": "transfer/side-a.png",
+      "byteIdentical": true,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "transfer/rear.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "transfer/front.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "deck/base.png",
+      "byteIdentical": true,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "deck/spindle.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "deck/contact.png",
+      "byteIdentical": true,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "deck/seated.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "deck/arm-park.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "deck/arm-above.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "deck/arm-contact.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "transfer/tilt-00.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "transfer/tilt-06.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "shelf/missing.png",
+      "byteIdentical": true,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "shelf/array-clear.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "shelf/array-frost.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "shelf/hero-clear.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "shelf/hero-frost.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "inspect/inspect-00.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "inspect/inspect-30.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "inspect/inspect-59.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/L0-side.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/L0-top.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/L0-front.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/L0-haze.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/L5-side.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/L5-top.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/L5-front.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/L5-haze.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/selected-side.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/selected-top.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/selected-front.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/selected-haze.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    },
+    {
+      "png": "room/sel.png",
+      "byteIdentical": false,
+      "meanAbsolute8bit": 0.0
+    }
+  ],
+  "foobar2000": "Not run. Validation uses the reference compositor.",
+  "visibleRoomJacketsInProof": 182
+}

@@ -168,6 +168,10 @@ setting*: Windows' own light / dark setting then decides, and the theme follows 
 
 ## How the views work
 
+**Vinyl Archive.** Choose **Array** or **Room**, select a jacket, then click it again or press Enter to inspect it. Drag the exposed record rim out of the sleeve and place the record over the platter. Playback starts when the stylus lands. A partial pull or missed drop returns the record to the sleeve. Escape returns to browsing. The playing album supplies the round label artwork, with the orange VHINEL print as the fallback.
+
+**Now Spinning.** During playback, use the transport button beside Queue to center the turntable in the main panel. Array and Room also enter this view after 30 seconds of inactivity. The archive context menu can disable automatic entry. Move the mouse or press Escape to return. Pausing holds the label angle.
+
 **Playlists view.** The manager lists every playlist with a rail line as long as the log of its track count; the
 active one is inverted, the playing one has an orange tab. The track rail beside the list shows one line per track
 (a long playlist is spread over the lines, each standing for an equal share), and the hover card names the track

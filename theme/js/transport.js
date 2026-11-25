@@ -276,6 +276,12 @@ function drawRight(gr) {
     label(gr, queueText, queueStyle, x + dp(10), ky);
     hits.add("queue-toggle", x, ty, qw, th);
     x -= dp(18);
+    if (fb.IsPlaying) {
+        const wide=W>=dp(1100), title=wide ? "NOW SPINNING" : "\u25ce", width=wide ? labelWidth(title,st(ST.key,0))+dp(16) : dp(26);
+        x-=width; box(gr,x,ty,width,th,hover && hover.id==="vinyl-screen" ? C.accent : C["line-faint"]);
+        gr.DrawText(title,font(wide ? 9 : 16,600),C.fg,x,ty,width,th,DT_CENTER_SINGLE);
+        hits.add("vinyl-screen",x,ty,width,th); x-=dp(12);
+    }
     // ORDER
     const order = clamp(plman.PlaybackOrder, 0, ORDERS.length - 1), ohov = hover && hover.id === "order";
     const ow = labelWidth(ORDERS[order], st(ST.val, 0));
@@ -386,6 +392,7 @@ function on_mouse_lbtn_up(x, y) {
     const a = hits.at(x, y);
     if (!a) return;
     if (a.id === "btn") [() => fb.Prev(), () => fb.PlayOrPause(), () => fb.Next(), () => fb.Stop()][a.data]();
+    else if (a.id === "vinyl-screen") send("vinyl-screen");
     else if (a.id === "queue-toggle") send("queue-open");
     else if (a.id === "order") orderMenu(a);
     else if (a.id === "update") updateMenu(a.x, a.y);
