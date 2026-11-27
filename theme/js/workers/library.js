@@ -207,14 +207,15 @@ function writeCache(albums) {
 }
 
 // ------------------------------------------------------------------------------------------------------- covers
-let queue = [], busy = 0, warm = [], fresh = false;
-const inFlight = new Set();
-const again = new Map();   // key -> an online job that came while its key was in flight: run once that one is done
+let queue = [], busy = 0, warm = [], refreshAll = false;
+const inFlight = new Map();
+const again = new Map();   // key -> a job that needs a result after the current job for this key
+const refreshKeys = new Set(), refreshedKeys = new Set();
 const TF_MTIME = fb.TitleFormat("[%last_modified%]");
 const coverFile = key => COVER_DIR + fnv(key) + ".jpg", noneFile = key => BARE_DIR + fnv(key) + ".none";
 // true when the album is known to have no artwork (and its first track has not changed since)
 function knownBare(job) {
-    if (fresh || !utils.IsFile(noneFile(job.key)) || !handles || job.i < 0 || job.i >= handles.Count) return false;
+    if (!utils.IsFile(noneFile(job.key)) || !handles || job.i < 0 || job.i >= handles.Count) return false;
     try { return utils.ReadTextFile(noneFile(job.key), 65001) === TF_MTIME.EvalWithMetadb(handles[job.i]); } catch (e) { return false; }
 }
 
@@ -231,28 +232,32 @@ const ONLINE_ART = fb.ProfilePath + "audio-archive-online\\data\\art\\", ONLINE_
 // job.warm: only fill the disk cache (nothing is sent)
 async function loadCover(job) {
     const file = coverFile(job.key);
+    const refresh = !job.online && (refreshKeys.has(job.key) || (refreshAll && !refreshedKeys.has(file)));
     let img = null;
-    if (utils.IsFile(file)) {
+    if (!refresh && utils.IsFile(file)) {
         if (job.warm) return;
         img = await d2d.LoadImageAsyncV2(0, file).catch(() => null);
     }
     // an online case's cover, downloaded by the panel
     if (!img && job.file && utils.IsFile(job.file)) {
         const src = await d2d.LoadImageAsyncV2(0, job.file).catch(() => null);
+        if (job.gen !== gen) return;
         if (src) {
             for (const d of [CACHE_DIR, COVER_DIR]) if (!utils.IsDirectory(d)) utils.CreateFolder(d);
             img = square(src, THUMB);
             img.SaveAs(file, "image/jpeg");
         }
     }
-    if (!img && handles && job.i >= 0 && job.i < handles.Count && !knownBare(job)) {
+    if (!img && handles && job.i >= 0 && job.i < handles.Count && (refresh || !knownBare(job))) {
         const h = handles[job.i], m = ONLINE_SONG.exec(h.RawPath);
         if (m) {
             const art = ONLINE_ART + (m[1] === "qq" ? "qq-" : "") + m[2] + ".jpg";
             const src = utils.IsFile(art) ? await d2d.LoadImageAsyncV2(0, art).catch(() => null) : null;
+            if (job.gen !== gen) return;
             if (src) { if (!utils.IsDirectory(COVER_DIR)) utils.CreateFolder(COVER_DIR); img = square(src, THUMB); img.SaveAs(file, "image/jpeg"); }
         } else {
             const r = await utils.GetAlbumArtAsyncV2(0, h, 0, false, false, false).catch(() => null);
+            if (job.gen !== gen) return;
             for (const d of [BARE_DIR, COVER_DIR]) if (!utils.IsDirectory(d)) utils.CreateFolder(d);
             if (r && r.image) {
                 img = square(r.image, THUMB);
@@ -260,11 +265,17 @@ async function loadCover(job) {
             } else utils.WriteTextFile(noneFile(job.key), TF_MTIME.EvalWithMetadb(h), false);
         }
     }
+    if (refresh) {
+        if (!img && utils.IsFile(file)) utils.RemovePath(file);
+        refreshKeys.delete(job.key);
+        if (refreshAll) refreshedKeys.add(file);
+    }
     if (job.gen !== gen || job.warm) return;
     if (!img) { postMessage({ type: "cover", gen, key: job.key, img: null, blur: null, retry: !!job.online }); return; }
     const blur = img.Resize(BLUR, BLUR, 2);
     blur.StackBlur(5);
-    postMessage({ type: "cover", gen, key: job.key, img, blur }, [img, blur]);
+    const source = `${file}|${utils.GetLastModified(file)}|${utils.GetFileSize(file)}`;
+    postMessage({ type: "cover", gen, key: job.key, img, blur, source }, [img, blur]);
 }
 
 function pump() {
@@ -275,13 +286,16 @@ function pump() {
         if (job.gen === gen && !utils.IsFile(coverFile(job.key)) && !knownBare(job)) start(job);
     }
 }
-// A job whose key is in flight already is dropped (that one answers for it), except an online one: the panel keeps its
-// key pending until an answer of this generation comes, and the one in flight may be of an older generation (no
-// answer) or have had no file to make it from, so it runs again once that one is done.
+// A pending job answers for the same key, unless it belongs to an earlier catalog, only warms the
+// disk cache, or needs an online file that just arrived.
 function start(job) {
-    if (inFlight.has(job.key)) { if (job.online) again.set(job.key, job); return; }
+    const previous = inFlight.get(job.key);
+    if (previous) {
+        if (job.online || previous.gen !== job.gen || (previous.warm && !job.warm)) again.set(job.key, job);
+        return;
+    }
     busy++;
-    inFlight.add(job.key);
+    inFlight.set(job.key, job);
     loadCover(job).catch(e => console.log("audio-archive cover: " + e)).finally(() => {
         busy--; inFlight.delete(job.key);
         const next = again.get(job.key);
@@ -298,10 +312,11 @@ onmessage = function (event) {
         handles = m.handles;
         if (m.thumb === 512 || m.thumb === 256) { THUMB = m.thumb; COVER_DIR = THUMB === 256 ? BARE_DIR : CACHE_DIR + `covers-${THUMB}\\`; }
         queue = []; again.clear();
-        if (m.fresh) fresh = true;
+        if (!m.refresh) { refreshAll = true; refreshedKeys.clear(); refreshKeys.clear(); }
+        else for (const key of m.refresh) refreshKeys.add(key);
         const { albums, tracks, folders } = buildAlbums(handles), t1 = performance.now();
         const written = writeCache(albums);
-        postMessage({ type: "catalog", gen, albums, items: tracks, folders, tracks: handles.Count, ms: { index: t1 - t0, cache: performance.now() - t1 }, written });
+        postMessage({ type: "catalog", gen, albums, items: tracks, folders, tracks: handles.Count, ms: { index: t1 - t0, cache: performance.now() - t1 }, written, refresh: m.refresh });
         warm = albums.map(a => ({ key: a.key, i: a.idx[0], gen, warm: true }));
         pump();
     } else if (m.type === "covers") {

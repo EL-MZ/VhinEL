@@ -12,9 +12,10 @@ VHINEL is a fork of [RhinE](https://github.com/ericzhang12111-cell/RhinE) that t
 
 | Feature | What changed |
 | --- | --- |
-| **Vinyl Archive** | Array and Room show vinyl jackets with sharp cover art across the shelves, a fallback for albums without artwork, and a floating title label for the selected album. Cover Grid remains available. |
+| **Vinyl Archive** | Browse Array like a record bin. Each step tips a jacket onto the front stack and reveals the next cover. Scroll back to flip it into place. Click an exposed sleeve to select it. Room and Cover Grid are also available. |
+| **Sleeve backs** | Jackets have visible edges as they turn. Array shows original back scans when available and generates color-matched backs with two columns of track titles for the rest. The previous crate stays visible and clickable on the right. |
 | **Interactive turntable** | Jacket inspection reveals the record rim. Drag it out, carry it to the deck, and release it over the platter. The record tilts into place, the tonearm lowers, and playback starts on contact. A partial pull or missed drop returns the record to the sleeve. |
-| **Now Spinning** | Open the centered turntable from the transport during playback. Array and Room can also open it after 30 seconds of inactivity. Toggle that behavior from the Archive context menu. Mouse movement or `Esc` returns to the previous view. |
+| **Now Spinning** | The playing LP sleeve lies behind the deck. Right-click for Wood or Plain, scroll to zoom, and click **Fullscreen** or double-click the deck to fill the monitor. `Esc` leaves fullscreen, then returns to the player. The optional idle view opens after 30 seconds and closes on mouse movement. |
 | **Playback animation** | Album artwork becomes the rotating center label, with a VHINEL label as fallback. The disc makes one turn in about 3.6 seconds and holds its position when paused. The tonearm follows album progress when album duration is available, or track progress otherwise. |
 | **Editable playback queue** | Open `QUEUE` in the player bar to see upcoming tracks. Drag rows to reorder them, or use the row menu to move or remove an entry. The player bar shows the queue count. |
 | **Add to queue** | In Archive, drag a cover or track row to the right and release when `ADD TO QUEUE` appears. In Playlists, select tracks and click or swipe right on the header's `ADD TO QUEUE` button, or drop the selection onto the right-hand panel. |
@@ -44,7 +45,7 @@ The record settles onto the platter, the tonearm lowers, and foobar2000 starts p
 
 ### 4. Open the fullscreen turntable
 
-During playback, open **Now Spinning** from the transport bar next to **Queue**. In builds with fullscreen controls, click **Fullscreen** or double-click the turntable. Press `Esc` to leave fullscreen.
+During playback, open **Now Spinning** from the transport bar next to **Queue**. Click **Fullscreen** or double-click the turntable. Press `Esc` to leave fullscreen.
 
 ![Fullscreen close-up of the turntable with the record playing](screenshots/5.png)
 

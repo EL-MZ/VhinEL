@@ -15,6 +15,7 @@ const CHILDREN = ["header", "transport", "stage", "manager", "head", "playlist",
 const PRESETS = ["album", "index"];
 
 let W = 0, H = 0;
+let turntableFullscreen = false;
 STATE.view = getSetting("view", "playlists");
 STATE.preset = getSetting("preset", "album");
 STATE.reduce = getSetting("reduceMotion", false);
@@ -109,6 +110,7 @@ function findPanels(attempt = 0) {
     if (STATE.boot && !REDUCE_MOTION && !rebuilt()) startBoot(); else P.fx.Show(false);
     layout();
     broadcast();
+    send("turntable-fullscreen-state",turntableFullscreen);
 }
 
 
@@ -130,7 +132,7 @@ onMessage("boot-end", () => {
 // rectangles of the frame and of the active view's children, in px
 function regions() {
     // the mini player: the stage panel alone, the whole (small) window
-    if (STATE.mini) return { stage: [0, 0, W, H] };
+    if (STATE.mini || turntableFullscreen) return { stage: [0, 0, W, H] };
     const top = dp(M.header), bottom = H - dp(M.transport + M.status), vh = bottom - top;
     const r = { header: [0, 0, W, top], transport: [0, bottom, W, H - bottom] };
     // Archive, Lyrics and Signal are all drawn by the stage panel
@@ -208,6 +210,7 @@ function startFx(kind, swap = switchMode) {
 // --------------------------------------------------------------------------------------------------- commands
 function setView(v) {
     if (!VIEWS.includes(v) || v === STATE.view) return;
+    if (turntableFullscreen) setTurntableFullscreen(false);
     STATE.view = v;
     setSetting("view", v);
     P.tip.Show(false);
@@ -285,7 +288,14 @@ function winCommand(cmd) {
 // corner again), at its shape's size in dp (MINI_SIZES, lib/bus.js)
 const miniWindow = () => `mini ${STATE.miniCorner} ${miniDims().join("x")}`;
 function applyWindow(mini = STATE.mini, snap = false) {
-    winCommand(mini ? miniWindow() + (snap ? " snap" : "") : STATE.borderless ? "borderless" : "window");
+    winCommand(mini ? miniWindow() + (snap ? " snap" : "") : STATE.borderless || turntableFullscreen ? "borderless" : "window");
+}
+function setTurntableFullscreen(on) {
+    if (on === turntableFullscreen || (on && (STATE.view !== "archive" || STATE.mini))) return;
+    turntableFullscreen = on;
+    if (!STATE.borderless) applyWindow();
+    layout();
+    send("turntable-fullscreen-state",on);
 }
 // the mini player on or off (on: true / false, or none to switch): the stage panel alone in a small window on top
 // The window first (tools/window.ps1, ≈ 0.4 s), the layout once the window has its new size (on_size): switched at once,
@@ -295,6 +305,7 @@ let MINI_WANT = null, MINI_TIMER = 0;
 function toggleMini(on) {
     const now = MINI_WANT == null ? STATE.mini : MINI_WANT, next = on == null ? !now : !!on;
     if (next === now) return;
+    if (turntableFullscreen) setTurntableFullscreen(false);
     MINI_WANT = next;
     setSetting("miniPlayer", next);
     applyWindow(next);
@@ -327,7 +338,10 @@ const UNLOAD_MARK = fb.ProfilePath + "audio-archive-cache\\frame-unload.txt";
 function rebuilt() {
     try { return utils.IsFile(UNLOAD_MARK) && Date.now() - +utils.ReadTextFile(UNLOAD_MARK, 65001) < 1500; } catch (e) { return false; }
 }
-function on_script_unload() { try { utils.WriteTextFile(UNLOAD_MARK, String(Date.now()), false); } catch (e) { /* no cache folder yet */ } }
+function on_script_unload() {
+    if (turntableFullscreen && !STATE.borderless) winCommand("window");
+    try { utils.WriteTextFile(UNLOAD_MARK, String(Date.now()), false); } catch (e) { /* no cache folder yet */ }
+}
 
 // presets are partial layout files (columns, groups, style script) imported into Columns UI, one per colour scheme and
 // mode: each also carries the scheme's light and dark colour sets with the mode in use (so an import never changes the
@@ -383,6 +397,7 @@ onMessage("queue-open", on => {
 onMessage("mode", toggleMode);
 onMessage("mode-to", setModeTo);
 onMessage("borderless", toggleBorderless);
+onMessage("turntable-fullscreen", setTurntableFullscreen);
 onMessage("mini", toggleMini);
 // a corner picked (the same one too: back to it after a drag)
 onMessage("mini-corner", c => { if (["tl", "tr", "bl", "br"].includes(c)) { STATE.miniCorner = c; setSetting("miniCorner", c); broadcast(); if (STATE.mini) applyWindow(true, true); } });

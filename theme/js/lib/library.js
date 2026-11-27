@@ -21,7 +21,8 @@ const LIB_LISTENERS = [];   // fn(kind): "catalog" when the albums or groups cha
 const LIB_DB = fb.ProfilePath + "audio-archive-cache\\library.db";
 const THUMB_PX = SCALE > 1.25 ? 512 : 256;
 let libHandles = null, libWorker = null, libTimer = 0;
-const libNotify = kind => LIB_LISTENERS.forEach(f => f(kind));
+const libNotify = (kind, detail) => LIB_LISTENERS.forEach(f => f(kind, detail));
+let coverRefresh = new Set();
 
 function libStart() {
     // GROUP › ONLINE: its copy on disk at once (the bridge is asked only once the Archive is shown, stage.js)
@@ -62,7 +63,11 @@ function libIndex(fresh = false) {
         list = fb.GetLibraryItems();
     }
     LIB.source = list && list.Count ? "library" : "playlists";
-    const gen = ++LIB.gen, post = handles => { libHandles = handles; libWorker.postMessage({ type: "index", gen, handles, fresh: fresh === true, thumb: THUMB_PX }); };
+    if (fresh === true) coverRefresh = null; // Re-index also looks for replaced sidecar artwork.
+    const gen = ++LIB.gen, post = handles => {
+        libHandles = handles;
+        libWorker.postMessage({ type: "index", gen, handles, refresh: coverRefresh && [...coverRefresh], thumb: THUMB_PX });
+    };
     withCueTracks(LIB.source === "library" ? list : playlistItems(), gen, post);
 }
 
@@ -178,7 +183,15 @@ function libLocationsAdded(task, handles) {
 const libChanged = () => { window.ClearTimeout(libTimer); libTimer = window.SetTimeout(() => libIndex(), 1500); };
 function on_library_items_added(handles) { cueForget(handles); libChanged(); }
 function on_library_items_removed() { libChanged(); }
-function on_library_items_changed(handles) { cueForget(handles); libChanged(); }
+function libArtworkChanged(handles) {
+    if (!coverRefresh || !handles) return;
+    for (let i = 0; i < handles.Count; i++) {
+        const h = handles[i];
+        coverRefresh.add(albumKey(h));
+        coverRefresh.add(folderKeyOf(h.Path));
+    }
+}
+function on_library_items_changed(handles) { cueForget(handles); libArtworkChanged(handles); libChanged(); }
 const playlistsChanged = () => { if (LIB.source === "playlists") libChanged(); };
 function on_playlist_items_added(i) { plDirty(i); if (libPlaylist(plman.GetPlaylistName(i))) playlistsChanged(); }
 function on_playlist_items_removed(i) { plDirty(i); if (libPlaylist(plman.GetPlaylistName(i))) playlistsChanged(); }
@@ -189,6 +202,15 @@ function libMessage(m) {
     if (m.type === "catalog") {
         LIB.live = true; LIB.tracks = m.tracks; LIB.ms = m.ms;
         thumbPending.clear(); thumbAsked = "";
+        const refresh = m.refresh && new Set(m.refresh);
+        if (!refresh || refresh.size) {
+            for (const key of THUMBS.keys()) {
+                if (refresh ? refresh.has(key) : !key.startsWith(ONL_KEY)) THUMBS.delete(key);
+            }
+            libNotify("cover-reset", refresh);
+        }
+        if (!refresh) coverRefresh = new Set();
+        else if (coverRefresh) for (const key of refresh) coverRefresh.delete(key);
         setAlbums(m.albums, m.items, m.folders);
         send("library", { files: m.tracks, albums: m.albums.length });
         console.log(`audio-archive library: ${m.tracks} tracks, ${m.albums.length} albums, index ${m.ms.index.toFixed(0)} ms, cache ${m.ms.cache.toFixed(0)} ms (${m.written} rows)`);
@@ -196,9 +218,9 @@ function libMessage(m) {
         thumbPending.delete(m.key);
         // (an online cover the worker could not make, m.retry: not kept as one without artwork, asked for again later)
         if (m.key.startsWith(ONL_KEY)) onlaThumbDone(m.key, !m.retry);
-        if (!m.retry && (m.img || LIB.live)) THUMBS.set(m.key, m.img ? { img: m.img, blur: m.blur } : null);
+        if (!m.retry && (m.img || LIB.live)) THUMBS.set(m.key, m.img ? { img: m.img, blur: m.blur, source: m.source } : null);
         trimThumbs();
-        libNotify("cover");
+        libNotify("cover", m.key);
     }
 }
 
@@ -488,7 +510,7 @@ function requestThumbs(albums, max = 48) {
     const list = [], onl = [], seen = new Set();
     for (const a of albums) {
         const k = coverKey(a);
-        if (seen.has(k) || THUMBS.has(k) || thumbPending.has(k)) continue;
+        if (seen.has(k) || THUMBS.has(k) || (k.startsWith(ONL_KEY) && thumbPending.has(k))) continue;
         seen.add(k);
         if (k.startsWith(ONL_KEY)) onl.push(a);
         else list.push({ key: k, i: a.idx ? a.idx[0] : -1 });

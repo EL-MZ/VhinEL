@@ -176,7 +176,7 @@ function placeSelection(key) {
     AR.tracks.key = "";
     if (R.length) {
         const r = rowState(AR.group);
-        if (at) { r.sel = at[1]; r.scroll.x = r.scroll.to = scrollTarget(r.sel, R[AR.group]); }
+        if (at) { r.sel = at[1]; r.flip.x = r.flip.to = r.sel; r.scroll.x = r.scroll.to = scrollTarget(r.sel, R[AR.group]); }
     }
     selectionChanged(false);
     // the rows and their cases at once: a paint before the next step would find the array empty (a blink)
@@ -194,7 +194,7 @@ function rowState(gi) {
         const sel = selIndexOf(gi);
         // a row and a slot are large on screen: they stop much nearer their end than other springs, so the last step is
         // not seen as a jump
-        r = { sel, scroll: Spring(scrollTarget(sel, arRows()[gi]), 9, .002), pos: Spring(gi - arrayStart(), 9, .0005), cases: new Map() };
+        r = { sel, flip: Spring(sel, 14, .002), scroll: Spring(scrollTarget(sel, arRows()[gi]), 9, .002), pos: Spring(gi - arrayStart(), 9, .0005), cases: new Map() };
         // The rows move as one strip: a new row joins it where the strip is now, one row on from its nearest
         // neighbour (and at its speed), so it slides in with the others rather than standing at its place while they
         // are still on their way there (a RANDOM PICK crosses several shelves at a time).
@@ -217,7 +217,8 @@ function slotsInView() {
     const k = arK(), ax = archiveArrayAxes(), m = archiveArrayMeta(), S = CASE_META.array_res[0] * k, [Ox, Oy] = origin(), aw = arrayW();
     let n = 0;
     while (n < 400) {
-        const ox = Ox + n * ax.y[0] * k - m.origin[0] * k, oy = Oy + n * ax.y[1] * k - m.origin[1] * k;
+        const depth = vinylAssets() ? crateDepth(n) : n;
+        const ox = Ox + depth * ax.y[0] * k - m.origin[0] * k, oy = Oy + depth * ax.y[1] * k - m.origin[1] * k;
         if (ox + S * .7 > aw || oy < dp(84) - S * .05) break;   // a lifted case's top stays under the two-row bar
         n++;
     }
@@ -466,6 +467,8 @@ function archiveUpdate(dt) {
     for (const [gi, r] of AR.rows) {
         more = stepSpring(r.pos, dt) || more;
         more = stepSpring(r.scroll, dt) || more;
+        r.flip.to = r.sel;
+        more = stepSpring(r.flip, dt) || more;
         const active = gi === AR.group, [i0, i1] = caseWindow(r, G[gi]);
         for (const i of [...r.cases.keys()]) if (i < i0 || i > i1) r.cases.delete(i);
         for (let i = i0; i <= i1; i++) {
@@ -509,7 +512,7 @@ function caseWindow(r, row, pos = r.pos.x, scroll = r.scroll.x) {
     const aw = arrayW(), margin = dp(160), x = -pos * ROWP, g = arrayGeom();
     let i0 = -1, i1 = -1;
     for (let i = 0; i < n; i++) {
-        const y = slotOf(row, i) - scroll;
+        const slot = slotOf(row, i) - scroll, y = vinylAssets() ? crateDepth(slot) : slot;
         if (y < -30 || y > 60) continue;
         const ox = Ox + (x * ax.x[0] * g.sx + y * ax.y[0]) * k - m.origin[0] * k, oy = Oy + (x * ax.x[1] * g.sy + y * ax.y[1]) * k - m.origin[1] * k;
         if (ox < aw + margin && ox + S > -margin && oy < H + margin && oy + S > -margin * 2) { if (i0 < 0) i0 = i; i1 = i; }
@@ -618,6 +621,7 @@ function selectKey(key) {
 // hover: the case under the mouse, which lifts its neighbours a little (-1: none, as for the cases' resting places)
 function caseTargets(i, r, active, row, hover = -1) {
     if (roomOn()) return roomTargets(i, r, active, row, hover);   // room.js: the room's swell
+    if (vinylAssets()) return {lift:0, clear:i === r.sel ? 1 : 0, gap:0, hov:0};
     const d = slotOf(row, i) - slotOf(row, r.sel), bell = Math.exp(-d * d / 4.5) - .32 * Math.exp(-d * d / 18), hd = i - hover;
     const hov = hover >= 0 ? Math.exp(-hd * hd / 2.2) : 0, isSel = active && i === r.sel;
     return {
@@ -640,11 +644,12 @@ function arrayGeom() {
     const aw = arrayW(), total = arRows().length;
     const key = [W, H, CASE_DIR, STATE.arrayScale, total, SHELF_SPAN, AR.layout].join("|");
     if (ARRAY_GEOM && ARRAY_GEOM.key === key) return ARRAY_GEOM;
-    const g = { key, wide: aw > H * 2, count: 4, x: Math.round(aw * .37), y: H - dp(87), sx: 1, sy: 1 };
+    const vinyl = AR.layout === "array" && !!vinylAssets();
+    const g = { key, vinyl, wide: aw > H * 2, count: 4, x: Math.round(aw * .37), y: H - dp(87), sx: 1, sy: 1 };
     if (roomOn()) { g.wide = false; g.count = ROOM_BEHIND; return (ARRAY_GEOM = g); }   // room.js: the shelves behind
     if (g.wide) {
         const k = arK(), ax = archiveArrayAxes(), meta = archiveArrayMeta(), sz = CASE_META.array_res[0];
-        const pad = dp(48), along = (SHELF_SPAN - 1) * PITCH;
+        const pad = dp(48), along = vinylAssets() ? crateRailCount(SHELF_SPAN) : (SHELF_SPAN - 1) * PITCH;
         const span = (along * ax.y[0] + sz) * k, pitch = ROWP * ax.x[0] * k;
         const capacity = clamp(Math.floor((aw - pad * 2 - span) / pitch) + 1, 4, 24);
         g.count = Math.max(1, Math.min(total || 1, capacity));
@@ -664,7 +669,13 @@ function arrayGeom() {
     ARRAY_GEOM = g;
     return g;
 }
-const arrayStart = () => arrayGeom().wide ? Math.min(AR.group, Math.max(0, arRows().length - arrayGeom().count)) : AR.group;
+function arrayStart() {
+    const g = arrayGeom();
+    if (!g.wide) return AR.group;
+    // The wide layout fits a fixed number of crates across the screen. Reserve one slot for the previous crate.
+    const first = AR.group - (g.vinyl && g.count > 1 ? 1 : 0);
+    return clamp(first, 0, Math.max(0, arRows().length - g.count));
+}
 const origin = () => { const g = arrayGeom(); return [g.x, g.y]; };
 function archiveResize() {
     ARRAY_GEOM = null;
@@ -680,7 +691,12 @@ function archiveResize() {
 // so a maximised window on a big display is filled instead of showing the same small cases in a sea of black
 const AR_REF = [936, 731];
 // × the Array scale chosen in MENU › Audio Archive or the Style view
-const arZoom = () => clamp(Math.min(arrayW() / dp(AR_REF[0]), H / dp(AR_REF[1])), 1, 1.6) * (STATE.arrayScale || 1);
+function arZoom() {
+    const aw = arrayW();
+    const zoom = clamp(Math.min(aw / dp(AR_REF[0]), H / dp(AR_REF[1])), 1, 1.6) * (STATE.arrayScale || 1);
+    // Keep room for the crate on the right when the album file leaves a narrow browsing area.
+    return AR.layout === "array" && vinylAssets() && arRows().length > 1 ? Math.min(zoom, aw / dp(625)) : zoom;
+}
 const arK = () => AS * SCALE * arZoom();   // array sprite px → screen px
 // the album index fits between ALBUM / SELECT and the row switcher
 const RULER_STEP = 7;
@@ -768,20 +784,22 @@ function drawFloor(gr, rows, G, Ox, Oy, k, toScreen) {
     const zx = fz * az[0], zy = fz * az[1];   // the floor lies fz below the sprites' origin plane
     // "glow": false in floor.json: shade only (no reflections of the cases and strips in the floor)
     for (const layer of F.meta.glow === false ? ["shade-"] : ["shade-", "glow-"]) for (const [gi, r] of rows) for (const part of ["", "-far"]) {
-        const row = G[gi], pos = r.pos.x, x = -pos * ROWP, n = slotCount(row);
+        const row = G[gi], pos = r.pos.x, x = -pos * ROWP;
+        const n = vinylAssets() ? crateRailCount(slotCount(row)) : slotCount(row);
+        const offset = r.scroll.x * (vinylAssets() ? CRATE_PITCH : PITCH);
         // the floor in front of a row shows as far as no row stands there: as the row in front fades out, it appears
         const far = gi > 0 ? 1 - rowAlpha(pos - 1) / 255 : 1;
         const alpha = Math.round(rowAlpha(pos) * (1 - rowTint(pos)) * (part ? far : 1));
         if (alpha <= 0) continue;
         for (const end of ["front", "back"]) {
-            const [sx, sy] = toScreen({ x, y: ((end === "front" ? -1 : n) - r.scroll.x) * PITCH, z: 0 });
+            const [sx, sy] = toScreen({ x, y: (end === "front" ? -1 : n) - offset, z: 0 });
             const img = F.img[layer + end + part];
             gr.DrawImage(img, sx - so0 * k, sy - so1 * k, rw * k, rh * k, 0, 0, img.Width, img.Height, 0, alpha);
         }
         if (n < 1) continue;
         // A = B diag(1, n) B^-1, B = [ax ay]: n times longer along the row, unchanged across it
         const s = (n - 1) / det, A = [1 - s * ay[0] * ax[1], s * ay[0] * ax[0], -s * ay[1] * ax[1], 1 + s * ay[1] * ax[0]];
-        const [ox, oy] = toScreen({ x, y: ((n - 1) / 2 - r.scroll.x) * PITCH, z: 0 }), ux = zx - so0, uy = zy - so1;
+        const [ox, oy] = toScreen({ x, y: (n - 1) / 2 - offset, z: 0 }), ux = zx - so0, uy = zy - so1;
         QM[0] = k * A[0]; QM[1] = k * A[2]; QM[2] = k * A[1]; QM[3] = k * A[3];
         QM[4] = ox + k * (A[0] * ux + A[1] * uy - zx); QM[5] = oy + k * (A[2] * ux + A[3] * uy - zy);
         gr.SetTransform(QM);
@@ -878,9 +896,14 @@ function archiveHidden() { pickStop(); AR.playAfter = null; AF.layer = null; AF.
 
 // covers of what is on screen, nearest first: the current row around the selection, then the rows behind
 function requestVisibleThumbs() {
-    if (AR.layout === "grid") { gridThumbs(); return; }
-    if (roomOn()) { roomThumbs(); return; }
-    const G = arRows(), list = [];
+    const crate = !!vinylAssets();
+    if (AR.layout === "grid" || roomOn()) {
+        if (crate) scheduleCrateJackets([], []);
+        if (AR.layout === "grid") gridThumbs();
+        else roomThumbs();
+        return;
+    }
+    const G = arRows(), list = [], nearby = [];
     const start = arrayStart(), count = arrayGeom().count;
     const first = Math.max(0, start - frontRows()), order = Array.from({ length: Math.min(count, G.length - start) + start - first }, (_, i) => first + i);
     order.sort((a, b) => Math.abs(a - AR.group) - Math.abs(b - AR.group));
@@ -888,6 +911,11 @@ function requestVisibleThumbs() {
         const r = rowState(gi), albums = G[gi].albums, [i0, i1] = caseWindow(r, G[gi], gi - start, r.scroll.to);
         const idx = [];
         for (let i = i0; i <= i1; i++) idx.push(i);
+        if (crate) {
+            const lo = Math.max(i0, Math.floor(Math.min(r.flip.x, r.sel)) - 2);
+            const hi = Math.min(i1, Math.ceil(Math.max(r.flip.x, r.sel)));
+            for (let i = lo; i <= hi; i++) nearby.push(albums[i]);
+        }
         idx.sort((p, q) => Math.abs(p - r.sel) - Math.abs(q - r.sel));
         idx.forEach(i => list.push(albums[i]));
     }
@@ -895,6 +923,8 @@ function requestVisibleThumbs() {
     if (AR.page === "artist" || AF.open) { const A = curArtist(); if (A && A.lib) list.unshift(...artistAlbums(A.lib).slice(0, 24)); }
     setThumbBudget(Math.max(160, list.length));
     requestThumbs(list, Math.max(48, list.length));
+    // Prepare the pile, its moving jacket, and the backs that will be exposed along the way.
+    if (crate) scheduleCrateJackets(list, nearby.slice(0, 20));
 }
 
 // ------------------------------------------------------------------------------------------------------ drawing
@@ -1019,10 +1049,12 @@ function drawArchive(gr) {
     if (!LABEL_LIVE) drawFloor(gr, rows, G, Ox, Oy, k, toScreen);   // the wallpaper takes the floor's place
     for (const [gi, r] of rows) {
         const row = G[gi], albums = row.albums, pos = r.pos.x, x = -pos * ROWP, active = gi === AR.group, [i0, i1] = caseWindow(r, row);
-        const nSlots = slotCount(row), items = [];
+        const crate = !!vinylAssets(), nSlots = crate ? crateRailCount(slotCount(row)) : slotCount(row), items = [];
+        const alpha = crate ? rowAlpha(pos) : 0, tint = crate ? rowTint(pos) : 0;
+        const front = -1-r.scroll.x*CRATE_PITCH, rear = front+nSlots+1.4;
         // a rail slot sorts just in front of the case behind it and behind the case standing in it
         if (R) for (let s = -1; s <= nSlots; s++) {
-            const y = (s - r.scroll.x) * PITCH;
+            const y = s * PITCH - r.scroll.x * (crate ? CRATE_PITCH : PITCH);
             if (y < -30 || y > 60) continue;
             items.push({ rail: s < 0 ? "front" : s >= nSlots ? "back" : "mid", gi, pos, x, y, z: 0, close: CLOSE[1] * (y + .4) });
         }
@@ -1030,20 +1062,32 @@ function drawArchive(gr) {
             const c = r.cases.get(i);
             if (!c) continue;
             const isSel = active && i === r.sel;
+            if (crate) {
+                const pose = cratePose(i, r.flip.x, isSel ? lift : 0);
+                const y = crateDepth(slotOf(row, i) - r.scroll.x);
+                // The most recently flipped jacket rests on top of the forward pile.
+                items.push({gi,i,a:albums[i],isSel,pos,x,y,z:isSel ? LIFT_OUT*lift : 0,pose,alpha,tint,
+                    close:100 + (pose.back ? i : -i) + (isSel ? lift*100 : 0)});
+                continue;
+            }
             const y = (slotOf(row, i) - r.scroll.x) * PITCH + c.gap.x, z = c.lift.x + (isSel ? LIFT_OUT * lift : 0);
             // where the case rests without the hover lift: its click area (#7), so the lift under the mouse does not
             // move the case being aimed at
             const yr = (slotOf(row, i) - r.scroll.x) * PITCH + c.gap.to, zr = caseTargets(i, r, active, row, -1).lift + (isSel ? LIFT_OUT * lift : 0);
             items.push({ gi, i, c, a: albums[i], active, isSel, pos, x, y, z, yr, zr, close: CLOSE[1] * y + CLOSE[2] * z * .2 });
         }
+        if (crate) crateLayers(items, r.flip.x, active ? lift : 0);
         items.sort((p, q) => p.close - q.close);
+        if (crate) drawCrateBoards(gr,gi,pos,x,front,rear,toScreen,false);
         for (const it of items) {
             const [sx, sy] = toScreen(it);
             if (it.rail) { drawRailSlot(gr, it, sx, sy, k, aw); continue; }
+            if (it.pose) { drawCrateJacket(gr,it,sx,sy,k); continue; }
             it.rest = toScreen({ x: it.x, y: it.yr, z: it.zr });
             selItem = drawArrayCase(gr, it, sx, sy, k, aw, I) || selItem;
         }
-        drawLip(gr, row, gi, r, x, toScreen, k);
+        if (crate) drawCrateBoards(gr,gi,pos,x,front,rear,toScreen,true);
+        else drawLip(gr, row, gi, r, x, toScreen, k);
     }
     // The case under the mouse was found when the mouse last moved; the shelves may have moved under it since (a shelf
     // switched with the keys, or one gone from view), so it is looked for again where the mouse stands, in this frame's
@@ -1055,12 +1099,12 @@ function drawArchive(gr) {
     }
     if (AR.selPlate) {
         const p = AR.selPlate;
-        drawCasePlate(gr, p.a, p.ox, p.oy, p.k, 255, vinylAssets() ? casePlateTitle(p.a) : undefined);
+        drawCasePlate(gr, p.a, p.ox, p.oy, p.k, 255, vinylAssets() ? casePlateTitle(p.a) : undefined, p.top);
         AR.selPlate = null;
     }
     if (AR.hoverPlate) {
         const h = AR.hoverPlate;
-        drawCasePlate(gr, h.a, h.ox, h.oy, h.k, h.alpha, casePlateTitle(h.a));
+        drawCasePlate(gr, h.a, h.ox, h.oy, h.k, h.alpha, casePlateTitle(h.a), h.top);
         AR.hoverPlate = null;
     }
     // the array dissolves into the background towards the file panel and the controls (over the wallpaper, mostly)
@@ -1087,7 +1131,7 @@ function drawInfoLayer(gr) {
 
 // one case of the array at screen point (sx, sy); returns { ox, oy } for the selected one
 function drawArrayCase(gr, it, sx, sy, k, aw, I) {
-    const vinyl = vinylAssets(), meta = vinyl ? vinylArray() : CASE_META.array, sz = vinyl ? 600 : CASE_META.array_res[0];
+    const meta = CASE_META.array, sz = CASE_META.array_res[0];
     const ox = sx - meta.origin[0] * k, oy = sy - meta.origin[1] * k, S = sz * k;
     if (ox > aw || ox + S < 0 || oy > H || oy + S < 0) return null;
     let selItem = null;
@@ -1098,28 +1142,22 @@ function drawArrayCase(gr, it, sx, sy, k, aw, I) {
     // One way of drawing a case at every place, so a row moving between places changes smoothly (a tinted row was drawn
     // frosted whatever its cases' clearing, so a case went frosted or clear at once as its row left or reached the
     // front). The cover under the case, the sharp one over the blurred as the case clears; tinted like the row.
-    if (vinyl) {
-        tintedCover(gr, meta.cover, ox, oy, k, alpha, f, t && t.img || vinylImage(vinyl.fallback));
-        const [x, y, w, h] = I.clear.crop, s = k / 2;
-        drawTinted(gr, vinylImage(I.clear), I.clear.png, f, ox + x*s, oy + y*s, w*s, h*s, alpha);
-    } else {
-        const cl = AR.frost ? clamp(it.c.clear.x, 0, 1) : 1;
-        tintedCover(gr, meta.cover, ox, oy, k, alpha, f, t && cl > .01 ? t.img : null, t && t.blur, t ? cl : 0);
-        if (cl < .99) drawTinted(gr, I.frost, "case" + CASE_DIR, f, ox, oy, S, S, Math.round(alpha * (1 - cl)));
-        if (cl > .01) drawTinted(gr, I.clear, "case-clear" + CASE_DIR, f, ox, oy, S, S, Math.round(alpha * cl));
-    }
+    const cl = AR.frost ? clamp(it.c.clear.x, 0, 1) : 1;
+    tintedCover(gr, meta.cover, ox, oy, k, alpha, f, t && cl > .01 ? t.img : null, t && t.blur, t ? cl : 0);
+    if (cl < .99) drawTinted(gr, I.frost, "case" + CASE_DIR, f, ox, oy, S, S, Math.round(alpha * (1 - cl)));
+    if (cl > .01) drawTinted(gr, I.clear, "case-clear" + CASE_DIR, f, ox, oy, S, S, Math.round(alpha * cl));
     // the spine labels belong to the selected shelf: they fade with its place as a shelf moves into it or out of it
     const la = Math.round(alpha * selness(it.pos));
-    if (la > 0 && !vinyl) drawSpineLabel(gr, meta.label, ox, oy, k, it.a.no, la);
+    if (la > 0) drawSpineLabel(gr, meta.label, ox, oy, k, it.a.no, la);
     // the top title: as its shelf shows them, and on the case under the mouse and its neighbours on any shelf (unless
     // CASE UNDER THE MOUSE is NOTHING), less tinted the nearer the mouse, so a case on a shelf behind can be read
     const hv = AR.hoverMode === "none" ? 0 : clamp(it.c.hov.x, 0, 1), ta = Math.round(alpha * Math.max(readable(f), hv));
-    if (!vinyl && AR.topTitles && ta > 0) drawTopTitle(gr, it.a, ox, oy, k, ta, f * (1 - hv));
+    if (AR.topTitles && ta > 0) drawTopTitle(gr, it.a, ox, oy, k, ta, f * (1 - hv));
     // the whole case (front face and top edge) at its resting place answers the mouse, on every shelf in view (a case
     // on another shelf switches to it); the one under it is outlined (the selected one too: a click inspects it), or
     // titled (not the selected one, which has its plate)
     if (alpha > 0) {
-        const P = vinyl ? meta.cover : casePoly(), rx = it.rest[0] - meta.origin[0] * k, ry = it.rest[1] - meta.origin[1] * k;
+        const P = casePoly(), rx = it.rest[0] - meta.origin[0] * k, ry = it.rest[1] - meta.origin[1] * k;
         AR.hits.push({ i: it.i, gi: it.gi, quad: P.map(([px, py]) => [rx + px * k, ry + py * k]) });
         const hovered = it.i === AR.hover && it.gi === AR.hoverRow && AR.insp === 0;
         if (hovered && !it.isSel && AR.hoverMode === "label") AR.hoverPlate = { a: it.a, ox, oy, k, alpha };
@@ -1139,8 +1177,8 @@ function casePlateTitle(a) {
     const chars = [...(a.title || tr("UNTITLED"))];
     return chars.length > 40 ? chars.slice(0, 39).join("") + "…" : chars.join("");
 }
-function drawCasePlate(gr, a, ox, oy, k, alpha = 255, txt = `ARC-${pad(a.no, 4)}`) {
-    const top = (vinylAssets() ? vinylArray() : CASE_META.array).cover[1], x1 = ox + top[0] * k + dp(4), y1 = oy + top[1] * k - dp(4), lx = x1 + dp(26), ly = y1 - dp(30);
+function drawCasePlate(gr, a, ox, oy, k, alpha = 255, txt = `ARC-${pad(a.no, 4)}`, top = CASE_META.array.cover[1]) {
+    const x1 = ox + top[0] * k + dp(4), y1 = oy + top[1] * k - dp(4), lx = x1 + dp(26), ly = y1 - dp(30);
     const fg = withAlpha(C.fg, alpha / 255), s = st(AR_ST.plate, C.bg, C.fg);
     gr.DrawLine(x1, y1, lx, ly, HAIR, fg);
     gr.DrawLine(lx, ly, lx + dp(60), ly, HAIR, fg);
@@ -1159,22 +1197,32 @@ function casePoly() {
     return CASE_POLY;
 }
 
-// With "Show the shelves in front" (the context menu; off by default) FRONT_ROWS shelves in front of the selected one
-// stay in view, see-through (FRONT_OPACITY), so a shelf just left is still there to go back to (with the mouse, see
-// archiveMouseMove); not on an ultrawide array, whose shelves stand side by side
+// Vinyl Array keeps the previous crate in view. The context menu can show a second one in the foreground.
+// On a wide array the previous crate is already in the side-by-side layout.
 const FRONT_ROWS = 2, FRONT_OPACITY = .6;
-const frontRows = () => roomOn() ? ROOM_FRONT : AR.frontShelves && !arrayGeom().wide ? FRONT_ROWS : 0;
+function frontRows() {
+    if (roomOn()) return ROOM_FRONT;
+    const g = arrayGeom();
+    if (g.wide) return 0;
+    return AR.frontShelves ? FRONT_ROWS : g.vinyl ? 1 : 0;
+}
 // rows fade in at the back; in front they turn see-through, then fade out beyond the last one shown
 const rowAlpha = pos => {
-    const n = frontRows(), front = pos >= 0 ? 1 : !n ? clamp(1 + pos, 0, 1) : lerp(1, FRONT_OPACITY, clamp(-pos, 0, 1)) * clamp(n + 1 + pos, 0, 1);
-    return Math.round(255 * front * clamp((arrayGeom().count - pos) / .8, 0, 1));
+    const g = arrayGeom(), n = frontRows(), distance = clamp(-pos, 0, 1);
+    const frontOpacity = g.vinyl ? lerp(.88, FRONT_OPACITY, clamp(-pos - 1, 0, 1)) : FRONT_OPACITY;
+    const front = !n ? 1 - distance : lerp(1, frontOpacity, distance) * clamp(n + 1 + pos, 0, 1);
+    return Math.round(255 * front * clamp((g.count - pos) / .8, 0, 1));
 };
 // how far a row is tinted towards the background: by its distance from the selected row's place, behind (and in front,
 // with the shelves in front shown; on an ultrawide array, from the selected row); the floor may fade them less
 // (floor.json "tint"). It follows a moving row smoothly.
 const rowTint = pos => {
     const g = arrayGeom(), floor = FLOOR.meta && FLOOR.meta.tint != null ? FLOOR.meta.tint : 1;
-    if (!g.wide) { const d = frontRows() ? Math.abs(pos) : Math.max(0, pos); return clamp(.38 * Math.min(d, 1) + .14 * d, 0, .8) * floor; }
+    if (!g.wide) {
+        const d = frontRows() ? Math.abs(pos) : Math.max(0, pos);
+        const foreground = g.vinyl && pos < 0 ? .65 : 1;
+        return clamp(.38 * Math.min(d, 1) + .14 * d, 0, .8) * floor * foreground;
+    }
     const distance = Math.abs(pos - (AR.group - arrayStart()));
     return clamp(.32 * Math.min(distance, 1) + .24 * distance / Math.max(1, g.count - 1), 0, .6) * floor;
 };
@@ -1803,7 +1851,9 @@ function inQuad(x, y, q) {   // any polygon
 function caseUnder(x, y) {
     for (const own of roomOn() ? [null] : [true, false]) for (let j = AR.hits.length - 1; j >= 0; j--) {
         const c = AR.hits[j];
-        if ((own === null || (c.gi === AR.group) === own) && inQuad(x, y, c.quad)) return c;
+        if (own !== null && (c.gi === AR.group) !== own) continue;
+        const inside = c.panels ? c.panels.some(q => inQuad(x, y, q)) : inQuad(x, y, c.quad);
+        if (inside) return c.board ? null : c;
     }
     return null;
 }
@@ -1876,12 +1926,13 @@ function archiveClick(x, y, a) {
     if (AF.open && x < arrayW()) return;   // the artist file covers the shelves
     if (AR.layout === "grid") { gridClick(x, y, a); return; }
     if (roomOn()) { roomClick(); return; }
-    if (AR.hover < 0) return;
-    noteClick(AR.hoverRow, AR.hover);
-    if (AR.hoverRow !== AR.group) { selectCase(AR.hoverRow, AR.hover); return; }
+    const hit = vinylAssets() ? x < arrayW() && caseUnder(x, y) : { i: AR.hover, gi: AR.hoverRow };
+    if (!hit || hit.i < 0) return;
+    noteClick(hit.gi, hit.i);
+    if (hit.gi !== AR.group) { selectCase(hit.gi, hit.i); return; }
     const r = AR.rows.get(AR.group);
-    if (AR.hover === r.sel) inspectClicked();
-    else moveAlbum(AR.hover - r.sel);
+    if (hit.i === r.sel) inspectClicked();
+    else moveAlbum(hit.i - r.sel);
 }
 // the case a click went to (array, room), for a double-click that follows it
 function noteClick(gi, i) {
@@ -2107,9 +2158,15 @@ function archiveMenu(x, y) {
     m.AppendMenuItem(tgOn ? 0 : 1, 23, tr("Properties (edit tags)…"));
     m.AppendMenuItem(curAlbum() ? 0 : 1, 11, tr("Random pick") + "	R");
     if (!vinylAssets()) m.AppendMenuItem(AR.topTitles ? 0x8 : 0, 12, tr("Titles on the cases' top edges"));
-    m.AppendMenuItem(AR.frontShelves ? 0x8 : 0, 18, tr("Show the shelves in front (see-through)"));
+    if (!arrayGeom().wide) {
+        const frontOption = arrayGeom().vinyl ? "Show a second crate in front (see-through)" : "Show the shelves in front (see-through)";
+        m.AppendMenuItem(AR.frontShelves ? 0x8 : 0, 18, tr(frontOption));
+    }
     if (!vinylAssets()) m.AppendMenuItem(AR.frost ? 0x8 : 0, 20, tr("Frosted glass on the cases"));
-    if (vinylAssets()) m.AppendMenuItem(VPLAYER.auto ? 0x8 : 0, 26, "Now Spinning after 30 seconds");
+    if (vinylAssets()) {
+        m.AppendMenuItem(VPLAYER.auto ? 0x8 : 0, 28, "Now Spinning after 30 seconds");
+        m.AppendMenuItem(VPLAYER.surface==="wood" ? 0x8 : 0, 29, "Wood surface in Now Spinning");
+    }
     m.AppendMenuItem(AR.page === "tracks" ? 0x8 : 0, 14, tr("Album file: all tracks with ratings") + "\tL");
     m.AppendMenuItem(AR.skipInst ? 0x8 : 0, 15, tr("Play albums without instrumentals"));
     m.AppendMenuItem(curAlbum() ? 0 : 1, 19, tr("Artist file") + "	I");
@@ -2144,7 +2201,8 @@ function archiveMenu(x, y) {
     else if (id === 13 && !onl) openFolder(itemTrack(curAlbum()) || albumFirst(curAlbum()));
     else if (id >= 500 && HOVER_MODES[id - 500]) { AR.hoverMode = HOVER_MODES[id - 500]; setSetting("caseHover", AR.hoverMode); window.Repaint(); }
     else if (id === 12) { AR.topTitles = !AR.topTitles; setSetting("caseTopTitles", AR.topTitles); window.Repaint(); }
-    else if (id === 26) { VPLAYER.auto=!VPLAYER.auto; setSetting("vinylScreenAuto",VPLAYER.auto); VPLAYER.idle=Date.now(); }
+    else if (id === 28) { VPLAYER.auto=!VPLAYER.auto; setSetting("vinylScreenAuto",VPLAYER.auto); VPLAYER.idle=Date.now(); }
+    else if (id === 29) vinylSurface(VPLAYER.surface==="wood" ? "plain" : "wood");
     else if (id === 20) setFrost(!AR.frost);
     else if (id === 18) { AR.frontShelves = !AR.frontShelves; setSetting("archiveFrontShelves", AR.frontShelves); requestVisibleThumbs(); clock.wake(); window.Repaint(); }
     else if (id === 14) setInfoPage(AR.page === "tracks" ? "file" : "tracks");

@@ -107,7 +107,7 @@ Running it again keeps the foobar2000 folder and installs the theme again.
 | Intro film | `MENU › Audio Archive › Play intro film`, or `PLAY INTRO` in the Style view; switch it off at start there | `B` |
 | Archive: add music | `+ ADD MUSIC FOLDER` while the Archive is empty (foobar2000's *Media Library* page) | — |
 | Archive: album / row | hover and click a case (on any shelf: a case on another shelf switches to it); `↑` `↓` beside the album index; `←` `→` beside the row name; wheel | `↑` `↓` album, `←` `→` row, `PgUp` `PgDn` `Home` `End` (Archive) |
-| Archive: the two shelves in front stay in view, see-through, to click back to | right-click › `Show the shelves in front (see-through)` (off by default) | — |
+| Archive: return to a visible previous shelf | click a sleeve in the crate to the right. Vinyl Array keeps one previous crate visible and offers `Show a second crate in front (see-through)` in the context menu on regular layouts. | - |
 | Archive: frosted glass on the cases not selected (their covers blurred) or clear glass on every case | right-click › `Frosted glass on the cases`, or `GLASS` under `DISPLAY` › `ARCHIVE` in `06 STYLE` (frosted by default) | — |
 | Archive: inspect the album | click the selected case (it is outlined under the mouse too); while the playing album is inspected, the next album that plays slides in (showing `TRACKS`: the next track) | `Enter`; `Esc` or click to return |
 | Archive: play / open the album | double-click a case (array and room; the album already playing goes on, a paused one resumes), or `PLAY ALBUM` / `OPEN ALBUM` (they work while inspecting too) | `Space` plays (or pauses it if it is playing); `Enter` while inspecting opens |
@@ -170,7 +170,13 @@ setting*: Windows' own light / dark setting then decides, and the theme follows 
 
 **Vinyl Archive.** Choose **Array** or **Room**, select a jacket, then click it again or press Enter to inspect it. Drag the exposed record rim out of the sleeve and place the record over the platter. Playback starts when the stylus lands. A partial pull or missed drop returns the record to the sleeve. Escape returns to browsing. The playing album supplies the round label artwork, with the orange VHINEL print as the fallback.
 
-**Now Spinning.** During playback, use the transport button beside Queue to center the turntable in the main panel. Array and Room also enter this view after 30 seconds of inactivity. The archive context menu can disable automatic entry. Move the mouse or press Escape to return. Pausing holds the label angle.
+In **Array**, the wheel or arrow keys flip through a bin. Each jacket pivots at its lower edge and lands on the stack toward you. Reverse direction to return it to the rear stack. You can also click an exposed cover or edge to select it.
+
+The backs use original scans when available. Generated backs use colors sampled from the front cover and show up to 12 tracks in two columns, with an omitted-track count for longer albums.
+
+**Now Spinning.** During playback, use the transport button beside Queue. The playing sleeve lies face up behind the turntable. Right-click the scene to choose **Wood surface** or **Plain surface**. Scroll or press `+` and `−` to zoom. Click **Fullscreen**, double-click the deck, or press `F11` to fill the monitor. The fullscreen button hides after a moment and reappears on mouse movement. Press `Esc` once to leave fullscreen and again to return to the previous view. Space pauses or resumes playback.
+
+Array and Room can also open Now Spinning automatically after 30 seconds of inactivity. Mouse movement dismisses this idle view. The Archive context menu lets you toggle automatic entry and the wood surface separately.
 
 **Playlists view.** The manager lists every playlist with a rail line as long as the log of its track count; the
 active one is inverted, the playing one has an orange tab. The track rail beside the list shows one line per track

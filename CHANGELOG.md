@@ -3,7 +3,15 @@
 Newest version first. Download any version from [Releases](https://github.com/ericzhang12111-cell/RhinE/releases).
 最新版本在最上面；各版本可在 Releases 页面下载。
 
-## 2.3.0 — 2026-11-24
+## VHINEL suite update - 2026-11-28
+
+- Browse Array with individual sleeve colors, visible jacket edges, and click targets that follow the artwork as it flips. The previous crate stays available on the right.
+- Array shows up to 12 tracks on generated backs, with an omitted-track count for longer albums. Original back scans take precedence.
+- Pull records from jackets in Array and Room and drop them onto the turntable. Playback starts when the stylus reaches the record. Now Spinning offers fullscreen, zoom, and Wood or Plain surfaces.
+- Open the playback queue from the transport bar, reorder it by dragging, or add tracks from Archive and Playlists. Selected tracks can also be copied between playlists.
+- The portable update includes the current scripts and vinyl render assets for RhinE 2.3.0 installations.
+
+## 2.3.0 - 2026-11-24
 
 **Added · 新增**
 - NetEase streams in Hi-Res (24-bit, up to 192 kHz) for the accounts that have it (SVIP), lossless otherwise. 网易云串流支持 Hi-Res（24 位，最高 192 kHz），需要账号支持（SVIP），否则为无损。
