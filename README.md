@@ -4,7 +4,7 @@
 
 VHINEL is a fork of [RhinE](https://github.com/ericzhang12111-cell/RhinE) that turns its CD-style archive into shelves of vinyl jackets. Pick an album, pull the record from its sleeve, and drop it onto the platter. foobar2000 starts playback as the stylus lands.
 
-![VHINEL's turntable with a seated record and lowered tonearm](authoring/vinyl/proofs/now-spinning.jpg)
+![VHINEL demo showing three LP jackets flipping in Array, selecting Night Signal, pulling the record onto the platter, and opening Now Spinning after playback begins](screenshots/vhinel-playback.gif)
 
 [Install VHINEL](#install-vhinel) · [Controls and settings](GUIDE.md) · [Blender assets and build notes](authoring/vinyl/INTEGRATION.md)
 
@@ -12,10 +12,10 @@ VHINEL is a fork of [RhinE](https://github.com/ericzhang12111-cell/RhinE) that t
 
 | Feature | What changed |
 | --- | --- |
-| **Vinyl Archive** | Browse Array like a record bin. Each step tips a jacket onto the front stack and reveals the next cover. Scroll back to flip it into place. Click an exposed sleeve to select it. Room and Cover Grid are also available. |
-| **Sleeve backs** | Jackets have visible edges as they turn. Array shows original back scans when available and generates color-matched backs with two columns of track titles for the rest. The previous crate stays visible and clickable on the right. |
-| **Interactive turntable** | Jacket inspection reveals the record rim. Drag it out, carry it to the deck, and release it over the platter. The record tilts into place, the tonearm lowers, and playback starts on contact. A partial pull or missed drop returns the record to the sleeve. |
-| **Now Spinning** | The playing LP sleeve lies behind the deck. Right-click for Wood or Plain, scroll to zoom, and click **Fullscreen** or double-click the deck to fill the monitor. `Esc` leaves fullscreen, then returns to the player. The optional idle view opens after 30 seconds and closes on mouse movement. |
+| **Vinyl Archive** | Use the wheel or `↑` and `↓` to flip through records in Array. Each jacket pivots from its bottom edge onto the pile in front. Reverse direction to return it. Click an exposed sleeve or spine to select it. The previous crate stays visible and clickable on the right. The Room view also uses vinyl jackets, and Cover Grid is available for browsing by artwork. |
+| **Sleeve backs** | Array gives each jacket visible thickness and its own edge colors. Original back scans take precedence. Generated backs use colors from the front cover and show up to 12 tracks in two columns, with a count of any omitted tracks. |
+| **Interactive turntable** | Open an LP in Array or Room, pull the record out by its rim, and drop it onto the platter. The disc tilts into place and playback starts when the stylus lands. A partial pull or missed drop returns the record to the sleeve. |
+| **Now Spinning** | Open the dedicated view from the transport bar. The playing sleeve lies behind the turntable. Right-click to choose **Wood** or **Plain** and scroll or use `+` and `-` to zoom. Click **Fullscreen**, double-click the deck, or press `F11` to fill the screen. `Esc` exits fullscreen and then returns to the previous view. Array and Room can open it after 30 seconds of inactivity and dismiss it on mouse movement. |
 | **Playback animation** | Album artwork becomes the rotating center label, with a VHINEL label as fallback. The disc makes one turn in about 3.6 seconds and holds its position when paused. The tonearm follows album progress when album duration is available, or track progress otherwise. |
 | **Editable playback queue** | Open `QUEUE` in the player bar to see upcoming tracks. Drag rows to reorder them, or use the row menu to move or remove an entry. The player bar shows the queue count. |
 | **Add to queue** | In Archive, drag a cover or track row to the right and release when `ADD TO QUEUE` appears. In Playlists, select tracks and click or swipe right on the header's `ADD TO QUEUE` button, or drop the selection onto the right-hand panel. |
@@ -25,27 +25,31 @@ The fork also includes the editable Blender scene, rendered jackets and turntabl
 
 ## Play a record
 
-### 1. Pull the record by its rim
+### 1. Browse and select an LP
 
-Open **Archive** and choose **Array** or **Room**. Select a jacket, then click it again or press `Enter` to inspect it. Grab the exposed rim and drag the record out of the sleeve.
+Open **Archive → Array** and flip through the crate with the mouse wheel or the up and down arrows. Select a jacket, then click it again or press `Enter` to inspect it. You can also inspect a jacket from **Room**.
+
+### 2. Pull the record by its rim
+
+Grab the exposed rim and drag the record out of the sleeve.
 
 ![Record rim peeking out of the album sleeve beside the empty turntable](screenshots/1.png)
 
-### 2. Drop the record onto the platter
+### 3. Drop the record onto the platter
 
 Drag the record over the platter and release it.
 
 ![Record pulled clear of the sleeve, with the prompt to drop it onto the platter](screenshots/2.png)
 
-### 3. Listen as the stylus lands
+### 4. Listen as the stylus lands
 
 The record settles onto the platter, the tonearm lowers, and foobar2000 starts playback. Click **Return to Archive** or press `Esc` to browse again.
 
 ![Record seated on the platter with the tonearm lowered and the sleeve alongside](screenshots/3.png)
 
-### 4. Open the fullscreen turntable
+### 5. Open Now Spinning
 
-During playback, open **Now Spinning** from the transport bar next to **Queue**. Click **Fullscreen** or double-click the turntable. Press `Esc` to leave fullscreen.
+During playback, open **Now Spinning** from the transport bar next to **Queue**. Click **Fullscreen**, double-click the turntable, or press `F11` to fill the screen. Press `Esc` to leave fullscreen.
 
 ![Fullscreen close-up of the turntable with the record playing](screenshots/5.png)
 
